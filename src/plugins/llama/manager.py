@@ -20,7 +20,7 @@ PROVIDERS_FILE = "/data/providers.json"
 RAG_DIR = "/data/rag"
 os.makedirs(RAG_DIR, exist_ok=True)
 
-_slots = {}
+_slots: dict[str, dict] = {}
 _slots_lock = threading.Lock()
 _enc = tiktoken.get_encoding("cl100k_base")
 EMBED_DIM = 384
@@ -636,7 +636,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     # ── GET route table ────────────────────────────────────────
-    _GET_ROUTES = {}  # populated after method definitions
+    _GET_ROUTES: dict[str, object] = {}  # populated after method definitions
 
     def do_GET(self):
         handler = self._GET_ROUTES.get(self.path)

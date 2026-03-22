@@ -79,7 +79,8 @@ ipset create allowed-domains hash:net
 echo "Resolving ${#ALLOWED_DOMAINS[@]} allowed domains..."
 
 for domain in "${ALLOWED_DOMAINS[@]}"; do
-    ips=$(dig +noall +answer A "$domain" 2>/dev/null | awk '$4 == "A" {print $5}')
+    # Use +short to avoid CNAME chain column-position issues
+    ips=$(dig +short A "$domain" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
     if [ -n "$ips" ]; then
         count=0
         while IFS= read -r ip; do

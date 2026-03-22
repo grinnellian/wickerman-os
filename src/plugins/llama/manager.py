@@ -635,93 +635,106 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.end_headers()
 
+    # ── GET route table ────────────────────────────────────────
+    _GET_ROUTES = {}  # populated after method definitions
+
     def do_GET(self):
-        if self.path == '/api/status':
-            slots_info = {}
-            for alias, s in _slots.items():
-                info = {"type": s.get("type", "local"), "status": s["status"],
-                        "detail": s.get("detail", ""), "settings": s.get("settings", {}),
-                        "system_prompt": s.get("system_prompt", "")[:100],
-                        "rag_enabled": s.get("rag_enabled", False),
-                        "rag_top_k": s.get("rag_top_k", 3),
-                        "loaded_at": s.get("loaded_at")}
-                if s.get("type") == "local":
-                    info.update({"model_file": s.get("model_file", ""), "port": s.get("port"),
-                                 "vram_est_mb": s.get("vram_est_mb", 0)})
-                else:
-                    info.update({"remote_model": s.get("remote_model", ""),
-                                 "provider_type": s.get("type", "openai")})
-                slots_info[alias] = info
-            ready = sum(1 for s in _slots.values() if s["status"] == "ready")
-            loading = sum(1 for s in _slots.values() if s["status"] == "loading")
-            self._json(200, {"status": "ready" if ready > 0 else ("loading" if loading > 0 else "idle"),
-                             "detail": f"{ready} agent(s) ready, {loading} loading", "slots": slots_info})
-
-        elif self.path == '/api/models':
-            self._json(200, {"models": list_models(),
-                             "loaded": {a: {"model_file": s.get("model_file", ""), "type": s.get("type"),
-                                            "settings": s.get("settings", {})} for a, s in _slots.items()}})
-
-        elif self.path == '/api/slots':
-            self._json(200, {"slots": [
-                {"alias": a, "type": s.get("type", "local"), "status": s["status"],
-                 "system_prompt": s.get("system_prompt", "")[:100],
-                 "rag_enabled": s.get("rag_enabled"), "rag_top_k": s.get("rag_top_k", 3)}
-                for a, s in _slots.items()]})
-
-        elif self.path == '/api/vram':
-            self._json(200, get_vram_info())
-
-        elif self.path == '/api/settings-schema':
-            self._json(200, SETTINGS_SCHEMA)
-
-        elif self.path == '/health':
-            ready = any(s["status"] == "ready" for s in _slots.values())
-            self._json(200 if ready or not _slots else 503,
-                       {"status": "ok" if ready else ("loading" if _slots else "no agents loaded")})
-
-        elif self.path == '/v1/models':
-            data = [{"id": a, "object": "model", "owned_by": s.get("type", "local")}
-                    for a, s in _slots.items() if s["status"] == "ready"]
-            self._json(200, {"object": "list", "data": data})
-
-        elif self.path.startswith('/api/rag/'):
-            parts = self.path.split('/')
-            if len(parts) >= 5:
-                index_id = parts[3]
-                action = parts[4]
-                if action == 'status':
-                    self._json(200, rag_status(index_id))
-                else:
-                    self._json(404, {"error": "Unknown RAG action"})
-            else:
-                self._json(400, {"error": "Invalid RAG path"})
-
+        handler = self._GET_ROUTES.get(self.path)
+        if handler:
+            handler(self)
+            return
+        # Prefix-matched routes
+        if self.path.startswith('/api/rag/'):
+            self._get_rag(self.path.split('/'))
         elif self.path.startswith('/v1/'):
-            slot, err = _resolve_model("default")
-            if slot:
-                self._proxy_to_local(slot)
-            else:
-                self._json(503, {"error": {"message": err, "type": "server_error"}})
-
+            self._get_v1_proxy()
         elif self.path == '/' or self.path == '/index.html':
             self._serve_file(os.path.join(PUBLIC_DIR, 'index.html'), 'text/html')
         else:
-            safe = self.path.lstrip('/')
-            fpath = os.path.realpath(os.path.join(PUBLIC_DIR, safe))
-            if not fpath.startswith(os.path.realpath(PUBLIC_DIR)):
-                self.send_response(403)
-                self.end_headers()
-                return
-            if os.path.isfile(fpath):
-                ct = 'text/html'
-                if fpath.endswith('.js'): ct = 'application/javascript'
-                elif fpath.endswith('.css'): ct = 'text/css'
-                elif fpath.endswith('.json'): ct = 'application/json'
-                self._serve_file(fpath, ct)
+            self._get_static_file()
+
+    def _get_status(self):
+        slots_info = {}
+        for alias, s in _slots.items():
+            info = {"type": s.get("type", "local"), "status": s["status"],
+                    "detail": s.get("detail", ""), "settings": s.get("settings", {}),
+                    "system_prompt": s.get("system_prompt", "")[:100],
+                    "rag_enabled": s.get("rag_enabled", False),
+                    "rag_top_k": s.get("rag_top_k", 3),
+                    "loaded_at": s.get("loaded_at")}
+            if s.get("type") == "local":
+                info.update({"model_file": s.get("model_file", ""), "port": s.get("port"),
+                             "vram_est_mb": s.get("vram_est_mb", 0)})
             else:
-                self.send_response(404)
-                self.end_headers()
+                info.update({"remote_model": s.get("remote_model", ""),
+                             "provider_type": s.get("type", "openai")})
+            slots_info[alias] = info
+        ready = sum(1 for s in _slots.values() if s["status"] == "ready")
+        loading = sum(1 for s in _slots.values() if s["status"] == "loading")
+        self._json(200, {"status": "ready" if ready > 0 else ("loading" if loading > 0 else "idle"),
+                         "detail": f"{ready} agent(s) ready, {loading} loading", "slots": slots_info})
+
+    def _get_models(self):
+        self._json(200, {"models": list_models(),
+                         "loaded": {a: {"model_file": s.get("model_file", ""), "type": s.get("type"),
+                                        "settings": s.get("settings", {})} for a, s in _slots.items()}})
+
+    def _get_slots(self):
+        self._json(200, {"slots": [
+            {"alias": a, "type": s.get("type", "local"), "status": s["status"],
+             "system_prompt": s.get("system_prompt", "")[:100],
+             "rag_enabled": s.get("rag_enabled"), "rag_top_k": s.get("rag_top_k", 3)}
+            for a, s in _slots.items()]})
+
+    def _get_vram(self):
+        self._json(200, get_vram_info())
+
+    def _get_settings_schema(self):
+        self._json(200, SETTINGS_SCHEMA)
+
+    def _get_health(self):
+        ready = any(s["status"] == "ready" for s in _slots.values())
+        self._json(200 if ready or not _slots else 503,
+                   {"status": "ok" if ready else ("loading" if _slots else "no agents loaded")})
+
+    def _get_v1_models(self):
+        data = [{"id": a, "object": "model", "owned_by": s.get("type", "local")}
+                for a, s in _slots.items() if s["status"] == "ready"]
+        self._json(200, {"object": "list", "data": data})
+
+    def _get_rag(self, parts):
+        if len(parts) >= 5:
+            index_id, action = parts[3], parts[4]
+            if action == 'status':
+                self._json(200, rag_status(index_id))
+            else:
+                self._json(404, {"error": "Unknown RAG action"})
+        else:
+            self._json(400, {"error": "Invalid RAG path"})
+
+    def _get_v1_proxy(self):
+        slot, err = _resolve_model("default")
+        if slot:
+            self._proxy_to_local(slot)
+        else:
+            self._json(503, {"error": {"message": err, "type": "server_error"}})
+
+    def _get_static_file(self):
+        safe = self.path.lstrip('/')
+        fpath = os.path.realpath(os.path.join(PUBLIC_DIR, safe))
+        if not fpath.startswith(os.path.realpath(PUBLIC_DIR)):
+            self.send_response(403)
+            self.end_headers()
+            return
+        if os.path.isfile(fpath):
+            ct = 'text/html'
+            if fpath.endswith('.js'): ct = 'application/javascript'
+            elif fpath.endswith('.css'): ct = 'text/css'
+            elif fpath.endswith('.json'): ct = 'application/json'
+            self._serve_file(fpath, ct)
+        else:
+            self.send_response(404)
+            self.end_headers()
 
     def _proxy_to_local(self, slot):
         url = f"http://127.0.0.1:{slot['port']}{self.path}"
@@ -912,6 +925,17 @@ class Handler(BaseHTTPRequestHandler):
         except FileNotFoundError:
             self.send_response(404)
             self.end_headers()
+
+# Populate GET route table
+Handler._GET_ROUTES = {
+    '/api/status': Handler._get_status,
+    '/api/models': Handler._get_models,
+    '/api/slots': Handler._get_slots,
+    '/api/vram': Handler._get_vram,
+    '/api/settings-schema': Handler._get_settings_schema,
+    '/health': Handler._get_health,
+    '/v1/models': Handler._get_v1_models,
+}
 
 # ── Main ─────────────────────────────────────────────────────
 def main():

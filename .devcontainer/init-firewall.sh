@@ -2,10 +2,43 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Preserve Docker DNS before flushing
+# ── Outbound allowlist ──────────────────────────────────────────────────
+# Only these domains can be reached from inside the container.
+# Edit this list to add/remove access. DNS resolution happens at
+# container start, so changes require a restart.
+#
+# Why allowlist?  This container may run with --dangerously-skip-permissions,
+# meaning Claude Code can execute arbitrary commands without prompting.
+# The firewall is the compensating control — even if code tries to
+# exfiltrate data, it can only reach these destinations.
+
+ALLOWED_DOMAINS=(
+    # Anthropic — Claude Code API and telemetry
+    "api.anthropic.com"
+    "claude.ai"
+    "statsig.anthropic.com"
+    "sentry.io"
+
+    # GitHub — git operations, API, raw content
+    "github.com"
+    "api.github.com"
+    "objects.githubusercontent.com"
+    "raw.githubusercontent.com"
+
+    # npm — Claude Code is installed via npm
+    "registry.npmjs.org"
+
+    # PyPI — pip install for Python dev deps
+    "pypi.org"
+    "files.pythonhosted.org"
+)
+
+# ── Firewall setup ──────────────────────────────────────────────────────
+
+# Preserve Docker's internal DNS rules before flushing
 DOCKER_DNS_RULES=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
 
-# Flush existing rules
+# Clean slate
 iptables -F
 iptables -X
 iptables -t nat -F
@@ -14,14 +47,14 @@ iptables -t mangle -F
 iptables -t mangle -X
 ipset destroy allowed-domains 2>/dev/null || true
 
-# Restore Docker DNS
+# Restore Docker DNS (containers need this to resolve service names)
 if [ -n "$DOCKER_DNS_RULES" ]; then
     iptables -t nat -N DOCKER_OUTPUT 2>/dev/null || true
     iptables -t nat -N DOCKER_POSTROUTING 2>/dev/null || true
     echo "$DOCKER_DNS_RULES" | xargs -L 1 iptables -t nat
 fi
 
-# Allow DNS, SSH, localhost
+# Always allow: DNS queries, localhost, SSH
 iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
 iptables -A INPUT -p udp --sport 53 -j ACCEPT
 iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
@@ -29,31 +62,7 @@ iptables -A INPUT -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A OUTPUT -o lo -j ACCEPT
 
-# Create ipset for allowed domains
-ipset create allowed-domains hash:net
-
-# Resolve and add allowed domains
-for domain in \
-    "api.anthropic.com" \
-    "statsig.anthropic.com" \
-    "sentry.io" \
-    "registry.npmjs.org" \
-    "pypi.org" \
-    "files.pythonhosted.org" \
-    "api.github.com" \
-    "github.com" \
-    "objects.githubusercontent.com" \
-    "marketplace.visualstudio.com" \
-    "vscode.blob.core.windows.net"; do
-    ips=$(dig +noall +answer A "$domain" 2>/dev/null | awk '$4 == "A" {print $5}')
-    if [ -n "$ips" ]; then
-        while IFS= read -r ip; do
-            ipset add allowed-domains "$ip" 2>/dev/null || true
-        done <<< "$ips"
-    fi
-done
-
-# Allow host network
+# Allow host network (needed for Docker<->host communication)
 HOST_IP=$(ip route | grep default | cut -d" " -f3)
 if [ -n "$HOST_IP" ]; then
     HOST_NETWORK=$(echo "$HOST_IP" | sed "s/\.[0-9]*$/.0\/24/")
@@ -61,13 +70,42 @@ if [ -n "$HOST_IP" ]; then
     iptables -A OUTPUT -d "$HOST_NETWORK" -j ACCEPT
 fi
 
-# Default deny, allow established + whitelisted
+# Resolve allowed domains to IPs and build the ipset
+ipset create allowed-domains hash:net
+echo "Resolving ${#ALLOWED_DOMAINS[@]} allowed domains..."
+
+for domain in "${ALLOWED_DOMAINS[@]}"; do
+    ips=$(dig +noall +answer A "$domain" 2>/dev/null | awk '$4 == "A" {print $5}')
+    if [ -n "$ips" ]; then
+        count=0
+        while IFS= read -r ip; do
+            ipset add allowed-domains "$ip" 2>/dev/null || true
+            count=$((count + 1))
+        done <<< "$ips"
+        echo "  $domain -> $count IPs"
+    else
+        echo "  $domain -> FAILED to resolve (will be blocked)"
+    fi
+done
+
+# Default policy: drop everything, then poke holes
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
 iptables -P OUTPUT DROP
+
+# Allow responses to connections we initiated
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Allow outbound only to whitelisted IPs
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
+
+# Reject (not drop) everything else — gives immediate feedback instead of timeout
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
-echo "Firewall configured — outbound restricted to whitelisted domains"
+echo ""
+echo "Firewall active. Outbound restricted to:"
+printf '  - %s\n' "${ALLOWED_DOMAINS[@]}"
+echo ""
+echo "To test: 'curl https://example.com' should fail immediately."
+echo "         'curl https://api.anthropic.com' should succeed."

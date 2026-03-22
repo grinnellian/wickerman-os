@@ -20,11 +20,12 @@ ALLOWED_DOMAINS=(
     "statsig.anthropic.com"
     "sentry.io"
 
-    # GitHub — git push/pull and API only
+    # GitHub — git push/pull, API, and CLI package repo
     # Note: githubusercontent.com deliberately excluded (serves arbitrary
     # user content). If a gh command fails needing it, add it back knowingly.
     "github.com"
     "api.github.com"
+    "cli.github.com"
 
     # npm — Claude Code is installed via npm
     "registry.npmjs.org"

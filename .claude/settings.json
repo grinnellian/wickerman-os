@@ -1,12 +1,18 @@
 {
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Skill(update-config:*)"
+    ]
+  },
   "hooks": {
-    "PostToolUse": [
+    "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "The tool input was: $ARGUMENTS. If this was a 'git commit' command (not just git add, git status, git diff, etc.), respond with: 'IMPORTANT: A commit was just made. Check if README.md, CONTRIBUTING.md, and CHANGELOG.md need updating to reflect the changes.' If it was NOT a git commit, respond with nothing."
+            "type": "command",
+            "command": "jq -r '.tool_input.command // \"\"' | grep -q 'git commit' && echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"REMINDER: Before this commit, verify that README.md, CONTRIBUTING.md, and CHANGELOG.md are up to date with the changes being committed. If they need updating, do that first.\"}}' || true"
           }
         ]
       }

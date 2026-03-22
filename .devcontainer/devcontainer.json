@@ -29,7 +29,8 @@
   },
   "remoteUser": "dev",
   "mounts": [
-    "source=wickerman-bashhistory-${devcontainerId},target=/commandhistory,type=volume"
+    "source=wickerman-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=wickerman-claude-config-${devcontainerId},target=/home/dev/.claude,type=volume"
   ],
   "containerEnv": {
     "PYTHONDONTWRITEBYTECODE": "1",

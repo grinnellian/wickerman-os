@@ -113,7 +113,15 @@ These are the most important changes in this release. None of them change how th
 - **CI pipeline:** GitHub Actions runs ruff (linting), mypy (type checking), and pytest (149 tests) on every push and PR to `main` and `beta2-standardization`. Original author's code in `src/` is excluded from linting — style changes will be proposed separately, not mixed in with structural work. A CI status badge on the README gives instant visibility into build health.
 - **mypy passing clean:** Fixed a duplicate module name collision (`app` appeared in both `src/downloader/` and `src/plugins/chat/`) by enabling `explicit_package_bases` in the mypy config. Added `types-requests` stubs and minimal type annotations to three unannotated module-level dicts. mypy now reports zero errors across all 16 source files.
 - **gh CLI:** Installed in the dev container so Claude Code and developers can create issues, manage PRs, and push code without leaving the container. Auth is handled via `GH_TOKEN` env var forwarded from the host — use a fine-grained personal access token scoped to just this repo for minimum blast radius.
-- **Git credential forwarding:** A minimal credential helper reads `GH_TOKEN` from the environment at push time. No token stored on disk inside the container.
+- **Git credential forwarding:** Getting `git push` to work from inside a locked-down container turned out to be a multi-step journey worth documenting:
+  1. **The problem:** The container has no GitHub credentials. `git push` fails with "authentication required."
+  2. **First attempt — `gh auth login`:** Interactive, opens a browser. Doesn't work in headless/autonomous mode.
+  3. **The solution — `GH_TOKEN` env var:** Create a fine-grained GitHub Personal Access Token (Settings → Developer Settings → Fine-grained tokens) scoped to just this repo with Contents read/write. Set it on the host (`export GH_TOKEN=github_pat_...` in `~/.bashrc`), and it flows into the container via `containerEnv` in `devcontainer.json`.
+  4. **The plumbing — credential helper:** A small script in the Dockerfile (`/usr/local/bin/git-credential-env`) reads `GH_TOKEN` from the environment and feeds it to git's credential system. This means `git push` works without any interactive login.
+  5. **Persistence — Claude config volume:** The container mounts a Docker volume at `/home/dev/.claude` so Claude Code's login tokens survive container rebuilds. Without this, you'd have to `claude login` after every rebuild.
+  6. **The simpler path we missed:** Claude Code's own settings (`env` in `.claude/settings.json`) can set environment variables for Claude's sessions. This would have covered `gh` and `git` commands run through Claude's Bash tool, though not manual terminal use. The `containerEnv` approach is broader.
+
+  **The principle:** "Getting auth right in containers is always harder than you think." Token-on-disk is bad, interactive login doesn't work headless, and the simplest solution (env var forwarding) requires plumbing at multiple layers.
 - **CONTRIBUTING.md:** Documents project structure, development setup (three paths: VS Code, standalone Docker, local), and code style expectations.
 - **This changelog:** Explains every change and the reasoning behind it.
 

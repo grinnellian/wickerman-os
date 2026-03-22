@@ -10,12 +10,13 @@
 | Phase | Status | Issues |
 |-------|--------|--------|
 | **0. Foundation** | **DONE** | #1, #2, #3 closed |
-| **1. Tests** | **Mostly done** | #4, #5, #7 closed; #6 (pipeline/RAG tests) open |
+| **1. Tests** | **DONE** | #4, #5, #6, #7 closed |
 | **2. Security** | **DONE** | #8, #9, #10, #11 closed |
-| **3. Code Quality** | **Partially done** | #15 closed; #12 (ruff), #13 (type hints), #14 (refactor monoliths) open |
-| **4. Infrastructure** | **Partially done** | #18 closed; #17 (CI pipeline) open — CI config exists, needs tests to pass |
+| **3. Code Quality** | **Mostly done** | #14, #15 closed; #12 (ruff), #13 (type hints) open — need ruff installed |
+| **4. Infrastructure** | **Mostly done** | #18 closed; #17 (CI pipeline) open — CI config exists, will validate on merge |
 
-**Remaining open issues**: #6, #12, #13, #14, #17 — all P0/P2, none blocking.
+**Remaining open issues**: #12, #13, #17 — all P2, require dev tooling (ruff/mypy) to execute.
+These are best completed in a session with pip available.
 
 ---
 

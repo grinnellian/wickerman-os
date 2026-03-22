@@ -14,10 +14,13 @@ The easiest way to get a working dev environment is the dev container — it has
 ### Option B: Standalone Docker (any terminal)
 
 ```bash
+# Set GH_TOKEN so the container can git push
+export GH_TOKEN=ghp_your_token_here  # or add to ~/.bashrc
+
 docker compose -f docker-compose.dev.yml build
 docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml exec dev zsh
-# Inside: make test, make lint, claude, etc.
+# Inside: make test, make lint, gh, claude, etc.
 ```
 
 ### Option C: Local (if you have Python 3.10+ and pip)
@@ -102,6 +105,7 @@ If you find a security vulnerability, please report it responsibly. Key areas to
 - **CORS:** Configured via `CORS_ORIGINS` environment variable (default: localhost only)
 - **Network:** Nginx binds to `127.0.0.1` by default — LAN access is opt-in
 - **Dev container firewall:** Outbound traffic restricted to allowlisted domains only — see `.devcontainer/init-firewall.sh`
+- **GH_TOKEN:** Forwarded into the container for git push — use a fine-grained PAT scoped to this repo with Contents read/write only
 
 ## Code Style
 

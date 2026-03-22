@@ -135,11 +135,16 @@ The repo includes a [devcontainer](.devcontainer/) that provides Python 3.11, py
 
 **Standalone (any terminal):**
 ```bash
+# Set GH_TOKEN for git push from inside the container
+export GH_TOKEN=ghp_your_token_here  # or add to ~/.bashrc
+
 docker compose -f docker-compose.dev.yml build
 docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml exec dev zsh
-# Inside: make test, make lint, claude, etc.
+# Inside: make test, make lint, gh, claude, etc.
 ```
+
+The container includes Python 3.11, pytest, ruff, mypy, gh CLI, Claude Code, and a network firewall restricting outbound to an allowlist. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ### Dev Commands
 

@@ -111,7 +111,9 @@ These are the most important changes in this release. None of them change how th
 - **Dev container:** Added `.devcontainer/` configuration for VS Code and a standalone `docker-compose.dev.yml`. Both provide Python 3.11, pytest, ruff, mypy, and Claude Code pre-installed in an isolated Docker environment. Uses the same Dockerfile — VS Code's "Reopen in Container" or `docker compose -f docker-compose.dev.yml up` from any terminal.
 - **Network firewall:** The dev container includes an outbound allowlist firewall (`init-firewall.sh`). This is the compensating control for running Claude Code with `--dangerously-skip-permissions`: even if code runs arbitrary commands, it can only reach whitelisted domains (Anthropic API, GitHub, npm, PyPI). All other outbound traffic is blocked with an immediate REJECT. The allowlist is a simple bash array at the top of the script — easy to audit and edit.
 - **CI pipeline:** GitHub Actions runs ruff (linting) and pytest (149 tests) on every push and PR. Original author's code in `src/` is excluded from linting — style changes will be proposed separately, not mixed in with structural work.
-- **CONTRIBUTING.md:** Documents project structure, development setup, and code style expectations.
+- **gh CLI:** Installed in the dev container so Claude Code and developers can create issues, manage PRs, and push code without leaving the container. Auth is handled via `GH_TOKEN` env var forwarded from the host — use a fine-grained personal access token scoped to just this repo for minimum blast radius.
+- **Git credential forwarding:** A minimal credential helper reads `GH_TOKEN` from the environment at push time. No token stored on disk inside the container.
+- **CONTRIBUTING.md:** Documents project structure, development setup (three paths: VS Code, standalone Docker, local), and code style expectations.
 - **This changelog:** Explains every change and the reasoning behind it.
 
 ### Documentation

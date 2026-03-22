@@ -52,7 +52,9 @@ ipset destroy allowed-domains 2>/dev/null || true
 if [ -n "$DOCKER_DNS_RULES" ]; then
     iptables -t nat -N DOCKER_OUTPUT 2>/dev/null || true
     iptables -t nat -N DOCKER_POSTROUTING 2>/dev/null || true
-    echo "$DOCKER_DNS_RULES" | xargs -L 1 iptables -t nat
+    while IFS= read -r rule; do
+        iptables -t nat $rule 2>/dev/null || true
+    done <<< "$DOCKER_DNS_RULES"
 fi
 
 # Always allow: DNS queries, localhost, SSH

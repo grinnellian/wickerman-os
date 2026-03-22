@@ -13,17 +13,18 @@ IFS=$'\n\t'
 # exfiltrate data, it can only reach these destinations.
 
 ALLOWED_DOMAINS=(
-    # Anthropic — Claude Code API and telemetry
+    # Anthropic — Claude Code API, docs, and telemetry
     "api.anthropic.com"
     "claude.ai"
+    "code.claude.com"
     "statsig.anthropic.com"
     "sentry.io"
 
-    # GitHub — git operations, API, raw content
+    # GitHub — git push/pull and API only
+    # Note: githubusercontent.com deliberately excluded (serves arbitrary
+    # user content). If a gh command fails needing it, add it back knowingly.
     "github.com"
     "api.github.com"
-    "objects.githubusercontent.com"
-    "raw.githubusercontent.com"
 
     # npm — Claude Code is installed via npm
     "registry.npmjs.org"

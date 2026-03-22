@@ -1,0 +1,33 @@
+## Standalone dev environment (no VS Code required)
+##
+## Usage:
+##   docker compose -f docker-compose.dev.yml build
+##   docker compose -f docker-compose.dev.yml up -d
+##   docker compose -f docker-compose.dev.yml exec dev zsh
+##
+## Inside the container: claude, pytest, ruff, mypy are all available.
+## The repo is mounted at /workspace.
+
+services:
+  dev:
+    build:
+      context: .devcontainer
+      args:
+        TZ: ${TZ:-America/Los_Angeles}
+        CLAUDE_CODE_VERSION: latest
+    container_name: wickerman-dev
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - .:/workspace:delegated
+      - wickerman-history:/commandhistory
+    working_dir: /workspace
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+    command: sleep infinity
+    ## Uncomment to skip firewall (faster startup, less secure):
+    # entrypoint: ""
+
+volumes:
+  wickerman-history:

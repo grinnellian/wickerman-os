@@ -125,6 +125,35 @@ sudo python3 wickermaninstall.py
 
 Your models, datasets, and plugin data in `~/WickermanSupport/` survive reinstalls. For a complete reset: `sudo python3 wickermaninstall.py --hard-reset`
 
+## Development
+
+### Dev Container (recommended)
+
+The repo includes a [devcontainer](.devcontainer/) that provides Python 3.11, pytest, ruff, mypy, and Claude Code pre-installed.
+
+**VS Code:** Open the repo, click "Reopen in Container" when prompted (requires the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension).
+
+**Standalone (any terminal):**
+```bash
+docker compose -f docker-compose.dev.yml build
+docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml exec dev zsh
+# Inside: make test, make lint, claude, etc.
+```
+
+### Dev Commands
+
+```bash
+make dev        # Install dev dependencies
+make test       # Run pytest
+make lint       # Run ruff
+make format     # Auto-format with ruff
+make typecheck  # Run mypy
+make ci         # lint + test
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for project structure and development workflow.
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.

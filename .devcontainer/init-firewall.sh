@@ -2,42 +2,29 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# ── Outbound allowlist ──────────────────────────────────────────────────
-# Only these domains can be reached from inside the container.
-# Edit this list to add/remove access. DNS resolution happens at
-# container start, so changes require a restart.
+# -- Forward proxy firewall (fail-closed) ---------------------------------
+# Applies iptables default-deny FIRST, then starts tinyproxy.
+# If tinyproxy fails to start, the container remains locked down
+# (only DNS, SSH, and loopback work) rather than being wide open.
 #
-# Why allowlist?  This container may run with --dangerously-skip-permissions,
-# meaning Claude Code can execute arbitrary commands without prompting.
-# The firewall is the compensating control — even if code tries to
-# exfiltrate data, it can only reach these destinations.
+# Domain allowlist:  /etc/tinyproxy/allowlist
+# Proxy config:      /etc/tinyproxy/tinyproxy.conf
+#
+# To add a domain at runtime (no restart needed):
+#   1. Edit /etc/tinyproxy/allowlist
+#   2. sudo kill -HUP $(pidof tinyproxy)
 
-ALLOWED_DOMAINS=(
-    # Anthropic — Claude Code API, docs, and telemetry
-    "api.anthropic.com"
-    "claude.ai"
-    "code.claude.com"
-    "statsig.anthropic.com"
-    "sentry.io"
+# -- Stop existing tinyproxy if running (handles re-runs) -----------------
 
-    # GitHub — git push/pull, API, and CLI package repo
-    # Note: githubusercontent.com deliberately excluded (serves arbitrary
-    # user content). If a gh command fails needing it, add it back knowingly.
-    "github.com"
-    "api.github.com"
-    "cli.github.com"
+if pidof tinyproxy > /dev/null 2>&1; then
+    echo "Stopping existing tinyproxy..."
+    kill "$(pidof tinyproxy)" 2>/dev/null || true
+    sleep 1
+fi
 
-    # npm — Claude Code is installed via npm
-    "registry.npmjs.org"
+# -- iptables setup -------------------------------------------------------
 
-    # PyPI — pip install for Python dev deps
-    "pypi.org"
-    "files.pythonhosted.org"
-)
-
-# ── Firewall setup ──────────────────────────────────────────────────────
-
-# Preserve Docker's internal DNS rules before flushing
+# Preserve Docker's internal DNS NAT rules before flushing
 DOCKER_DNS_RULES=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
 
 # Clean slate
@@ -47,9 +34,8 @@ iptables -t nat -F
 iptables -t nat -X
 iptables -t mangle -F
 iptables -t mangle -X
-ipset destroy allowed-domains 2>/dev/null || true
 
-# Restore Docker DNS (containers need this to resolve service names)
+# Restore Docker DNS (containers need 127.0.0.11 for service name resolution)
 if [ -n "$DOCKER_DNS_RULES" ]; then
     iptables -t nat -N DOCKER_OUTPUT 2>/dev/null || true
     iptables -t nat -N DOCKER_POSTROUTING 2>/dev/null || true
@@ -58,15 +44,31 @@ if [ -n "$DOCKER_DNS_RULES" ]; then
     done <<< "$DOCKER_DNS_RULES"
 fi
 
-# Always allow: DNS queries, localhost, SSH
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-iptables -A INPUT -p udp --sport 53 -j ACCEPT
-iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
-iptables -A INPUT -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+# -- Default deny (applied BEFORE proxy starts = fail-closed) -------------
+
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT DROP
+
+# -- Always allowed: loopback, established, DNS, SSH, host network --------
+
+# Loopback (apps connect to local proxy on 127.0.0.1:3128 via this)
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A OUTPUT -o lo -j ACCEPT
 
-# Allow host network (needed for Docker<->host communication)
+# Established/related connections (early in chain for performance)
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# DNS (UDP 53 — needed for tinyproxy to resolve allowed domains)
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+iptables -A INPUT -p udp --sport 53 -j ACCEPT
+
+# SSH
+iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+
+# Host network (Docker gateway — needed for Docker<->host communication)
 HOST_IP=$(ip route | grep default | cut -d" " -f3)
 if [ -n "$HOST_IP" ]; then
     HOST_NETWORK=$(echo "$HOST_IP" | sed "s/\.[0-9]*$/.0\/24/")
@@ -74,43 +76,53 @@ if [ -n "$HOST_IP" ]; then
     iptables -A OUTPUT -d "$HOST_NETWORK" -j ACCEPT
 fi
 
-# Resolve allowed domains to IPs and build the ipset
-ipset create allowed-domains hash:net
-echo "Resolving ${#ALLOWED_DOMAINS[@]} allowed domains..."
+# -- Proxy enforcement ----------------------------------------------------
+# Only the tinyproxy user can make outbound HTTP/HTTPS connections.
+# Everyone else must go through the proxy (via env vars).
 
-for domain in "${ALLOWED_DOMAINS[@]}"; do
-    # Use +short to avoid CNAME chain column-position issues
-    ips=$(dig +short A "$domain" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
-    if [ -n "$ips" ]; then
-        count=0
-        while IFS= read -r ip; do
-            ipset add allowed-domains "$ip" 2>/dev/null || true
-            count=$((count + 1))
-        done <<< "$ips"
-        echo "  $domain -> $count IPs"
-    else
-        echo "  $domain -> FAILED to resolve (will be blocked)"
-    fi
-done
+TINYPROXY_UID=$(id -u tinyproxy)
+iptables -A OUTPUT -m owner --uid-owner "$TINYPROXY_UID" -p tcp --dport 443 -j ACCEPT
+iptables -A OUTPUT -m owner --uid-owner "$TINYPROXY_UID" -p tcp --dport 80 -j ACCEPT
 
-# Default policy: drop everything, then poke holes
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT DROP
-
-# Allow responses to connections we initiated
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-# Allow outbound only to whitelisted IPs
-iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
-
-# Reject (not drop) everything else — gives immediate feedback instead of timeout
+# Reject (not drop) unmatched outbound — gives immediate error feedback
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
+echo "iptables applied (default-deny). Starting proxy..."
+
+# -- Start tinyproxy -------------------------------------------------------
+
+# Create PID directory (on tmpfs, lost between container restarts)
+mkdir -p /run/tinyproxy
+chown tinyproxy:tinyproxy /run/tinyproxy
+
+# Start proxy (daemonizes into background)
+tinyproxy -c /etc/tinyproxy/tinyproxy.conf
+
+# Verify it started
+sleep 1
+if ! pidof tinyproxy > /dev/null 2>&1; then
+    echo "ERROR: tinyproxy failed to start. Check /var/log/tinyproxy/tinyproxy.log"
+    echo "Firewall IS active (fail-closed). Only DNS, SSH, and loopback work."
+    echo "Fix the proxy config, then re-run this script."
+    exit 1
+fi
+
+echo "Forward proxy started on 127.0.0.1:3128"
+
+# -- Summary ---------------------------------------------------------------
+
+DOMAIN_COUNT=$(grep -cve '^\s*#' -e '^\s*$' /etc/tinyproxy/allowlist)
 echo ""
-echo "Firewall active. Outbound restricted to:"
-printf '  - %s\n' "${ALLOWED_DOMAINS[@]}"
+echo "Firewall active. Outbound HTTP/HTTPS filtered by forward proxy."
+echo "  Proxy:    http://127.0.0.1:3128"
+echo "  Domains:  ${DOMAIN_COUNT} patterns in /etc/tinyproxy/allowlist"
+echo "  Log:      /var/log/tinyproxy/tinyproxy.log"
 echo ""
-echo "To test: 'curl https://example.com' should fail immediately."
-echo "         'curl https://api.anthropic.com' should succeed."
+echo "To test:"
+echo "  curl -x http://127.0.0.1:3128 https://api.anthropic.com  → should succeed"
+echo "  curl -x http://127.0.0.1:3128 https://example.com        → should fail (403)"
+echo "  curl https://example.com                                  → should fail (REJECT)"
+echo ""
+echo "To add a domain at runtime:"
+echo "  1. sudo nano /etc/tinyproxy/allowlist"
+echo "  2. sudo kill -HUP \$(pidof tinyproxy)"

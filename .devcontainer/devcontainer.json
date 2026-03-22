@@ -34,7 +34,13 @@
   ],
   "containerEnv": {
     "PYTHONDONTWRITEBYTECODE": "1",
-    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "http_proxy": "http://127.0.0.1:3128",
+    "https_proxy": "http://127.0.0.1:3128",
+    "HTTP_PROXY": "http://127.0.0.1:3128",
+    "HTTPS_PROXY": "http://127.0.0.1:3128",
+    "no_proxy": "localhost,127.0.0.1,127.0.0.11,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+    "NO_PROXY": "localhost,127.0.0.1,127.0.0.11,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",

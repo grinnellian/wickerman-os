@@ -15,7 +15,7 @@ ENV TZ=${TZ} \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git curl ca-certificates sudo make \
         zsh nano vim less jq \
-        iptables ipset iproute2 dnsutils \
+        iptables tinyproxy iproute2 dnsutils \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
@@ -41,7 +41,9 @@ RUN pip install --no-cache-dir \
     ruff>=0.4 \
     mypy>=1.10
 
-# Firewall script
+# Forward proxy config (tinyproxy) and firewall script
+COPY tinyproxy.conf /etc/tinyproxy/tinyproxy.conf
+COPY allowlist.conf /etc/tinyproxy/allowlist
 COPY init-firewall.sh /usr/local/bin/init-firewall.sh
 RUN chmod +x /usr/local/bin/init-firewall.sh
 

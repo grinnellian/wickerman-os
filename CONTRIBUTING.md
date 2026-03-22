@@ -104,7 +104,7 @@ If you find a security vulnerability, please report it responsibly. Key areas to
 - **Volume mounts:** `resolve_volume()` validates paths within allowed directories
 - **CORS:** Configured via `CORS_ORIGINS` environment variable (default: localhost only)
 - **Network:** Nginx binds to `127.0.0.1` by default — LAN access is opt-in
-- **Dev container firewall:** Outbound traffic restricted to allowlisted domains only — see `.devcontainer/init-firewall.sh`
+- **Dev container firewall:** Outbound HTTP/HTTPS is routed through a tinyproxy forward proxy that filters by domain name. iptables blocks direct outbound from all users except the proxy. See `.devcontainer/allowlist.conf` for the domain list and `.devcontainer/init-firewall.sh` for the setup. To add a domain at runtime: edit `/etc/tinyproxy/allowlist` and `sudo kill -HUP $(pidof tinyproxy)`.
 - **GH_TOKEN:** Forwarded into the container for git push — use a fine-grained PAT scoped to this repo with Contents read/write only
 
 ## Code Style

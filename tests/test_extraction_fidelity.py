@@ -5,6 +5,7 @@ to what the original string constants contained.
 """
 import json
 import sys
+
 import pytest
 
 sys.path.insert(0, ".")
@@ -71,7 +72,7 @@ class TestPluginManifests:
         assert len(plugins) == 5
 
     def test_all_serializable(self, plugins):
-        for fname, manifest in plugins.items():
+        for _fname, manifest in plugins.items():
             serialized = json.dumps(manifest, indent=2)
             roundtripped = json.loads(serialized)
             assert roundtripped["name"] == manifest["name"]

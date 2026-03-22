@@ -4,6 +4,7 @@ Validates that all plugin manifests conform to the expected schema.
 """
 import json
 import sys
+
 import pytest
 
 sys.path.insert(0, ".")
@@ -33,23 +34,23 @@ class TestPluginSchema:
         assert not unknown, f"{fname} has unknown keys: {unknown}"
 
     def test_name_is_string(self, manifest_entry):
-        fname, manifest = manifest_entry
+        _fname, manifest = manifest_entry
         assert isinstance(manifest["name"], str)
         assert len(manifest["name"]) > 0
 
     def test_container_name_starts_with_wm(self, manifest_entry):
-        fname, manifest = manifest_entry
+        _fname, manifest = manifest_entry
         assert manifest["container_name"].startswith("wm-")
 
     def test_ports_is_list(self, manifest_entry):
-        fname, manifest = manifest_entry
+        _fname, manifest = manifest_entry
         assert isinstance(manifest["ports"], list)
         assert len(manifest["ports"]) > 0
         for p in manifest["ports"]:
             assert isinstance(p, (int, str)), f"Port should be int or string, got {type(p)}"
 
     def test_nginx_host_is_string(self, manifest_entry):
-        fname, manifest = manifest_entry
+        _fname, manifest = manifest_entry
         assert isinstance(manifest["nginx_host"], str)
         assert ".wickerman.local" in manifest["nginx_host"]
 
@@ -90,7 +91,7 @@ class TestPluginSchema:
         assert roundtripped["container_name"] == manifest["container_name"]
 
     def test_help_is_nonempty_string(self, manifest_entry):
-        fname, manifest = manifest_entry
+        _fname, manifest = manifest_entry
         assert isinstance(manifest["help"], str)
         assert len(manifest["help"]) > 10
 

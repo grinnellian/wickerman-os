@@ -7,8 +7,8 @@ that can't be imported without Docker.
 """
 import os
 import re
+
 import pytest
-import tempfile
 
 
 # ── safe_path (identical in forge and trainer) ─────────────────────────────
@@ -275,7 +275,7 @@ class TestResolveModel:
 
     def test_default_finds_any_ready_if_no_local(self):
         slots = {"remote1": {"status": "ready", "type": "openai"}}
-        s, err = self._resolve("default", slots)
+        s, _err = self._resolve("default", slots)
         assert s is not None
 
     def test_default_prefers_local_over_remote(self):
@@ -283,7 +283,7 @@ class TestResolveModel:
             "remote1": {"status": "ready", "type": "openai"},
             "local1": {"status": "ready", "type": "local"},
         }
-        s, err = self._resolve("default", slots)
+        s, _err = self._resolve("default", slots)
         assert s["type"] == "local"
 
     def test_default_empty_slots(self):
@@ -293,12 +293,12 @@ class TestResolveModel:
 
     def test_none_treated_as_default(self):
         slots = {"agent1": {"status": "ready", "type": "local"}}
-        s, err = self._resolve(None, slots)
+        s, _err = self._resolve(None, slots)
         assert s is not None
 
     def test_exact_alias_match(self):
         slots = {"my-agent": {"status": "ready", "type": "local"}}
-        s, err = self._resolve("my-agent", slots)
+        s, _err = self._resolve("my-agent", slots)
         assert s is not None
 
     def test_alias_not_ready(self):
@@ -309,17 +309,17 @@ class TestResolveModel:
 
     def test_model_file_match(self):
         slots = {"agent1": {"status": "ready", "type": "local", "model_file": "llama-7b.gguf"}}
-        s, err = self._resolve("llama-7b.gguf", slots)
+        s, _err = self._resolve("llama-7b.gguf", slots)
         assert s is not None
 
     def test_fuzzy_substring_match(self):
         slots = {"my-llama-agent": {"status": "ready", "type": "local"}}
-        s, err = self._resolve("llama", slots)
+        s, _err = self._resolve("llama", slots)
         assert s is not None
 
     def test_fuzzy_case_insensitive(self):
         slots = {"MyAgent": {"status": "ready", "type": "local"}}
-        s, err = self._resolve("myagent", slots)
+        s, _err = self._resolve("myagent", slots)
         assert s is not None
 
     def test_not_found(self):
@@ -367,12 +367,12 @@ class TestResolveVolume:
         assert m == "ro"
 
     def test_loras_token(self):
-        h, c, m = resolve_volume("{loras}:/loras", "wm-trainer")
+        h, c, _m = resolve_volume("{loras}:/loras", "wm-trainer")
         assert h == "/support/loras"
         assert c == "/loras"
 
     def test_workspace_token(self):
-        h, c, m = resolve_volume("{workspace}:/workspace", "wm-forge")
+        h, c, _m = resolve_volume("{workspace}:/workspace", "wm-forge")
         assert h == "/home/user/wickerman/workspace"
         assert c == "/workspace"
 
@@ -388,5 +388,5 @@ class TestResolveVolume:
 
     def test_multiple_tokens_in_one_spec(self):
         # Unlikely but should work — each token replaced independently
-        h, c, m = resolve_volume("{models}:/models", "test", support_dir="/sup")
+        h, _c, _m = resolve_volume("{models}:/models", "test", support_dir="/sup")
         assert h == "/sup/models"

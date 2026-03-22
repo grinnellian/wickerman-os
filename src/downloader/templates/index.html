@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wickerman — Model Downloader</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{background:#11111b;color:#cdd6f4;font-family:system-ui,sans-serif;padding:24px;min-height:100vh}
+.c{max-width:900px;margin:0 auto}h1{text-align:center;margin-bottom:4px}.sub{text-align:center;color:#6c7086;margin-bottom:24px;font-size:14px}
+.nav{text-align:center;margin-bottom:20px}.nav a{color:#89b4fa;text-decoration:none;font-size:15px}
+.tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid #313244}
+.tab{padding:10px 20px;cursor:pointer;color:#6c7086;font-size:14px;font-weight:600;border-bottom:2px solid transparent}.tab:hover{color:#cdd6f4}.tab.active{color:#89b4fa;border-color:#89b4fa}
+.tc{display:none}.tc.active{display:block}
+.sf{display:flex;gap:8px;margin-bottom:16px}.sf input{flex:1;padding:12px 16px;border-radius:8px;border:1px solid #313244;background:#1e1e2e;color:#cdd6f4;font-size:15px;outline:none}
+.sf input:focus{border-color:#89b4fa}.sf input::placeholder{color:#6c7086}
+.sf button,.btn{padding:12px 20px;border-radius:8px;border:none;background:#89b4fa;color:#1e1e2e;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap}
+.sf button:hover,.btn:hover{background:#74c7ec}.sf button:disabled{opacity:.5;cursor:not-allowed}
+.btn2{background:#313244;color:#cdd6f4}.btn2:hover{background:#45475a}.btns{padding:6px 14px;font-size:12px;border-radius:6px}
+.mi{background:#1e1e2e;border-radius:10px;padding:16px;margin-bottom:16px}.mi h2{font-size:18px;margin-bottom:8px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}.tg{background:#313244;color:#a6adc8;padding:2px 10px;border-radius:12px;font-size:12px}
+.fcat{color:#89b4fa;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid #313244}
+.fi{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#1e1e2e;border-radius:6px;margin-bottom:4px;font-size:14px}
+.fi input{accent-color:#89b4fa}.fn{flex:1;word-break:break-all}.fs{color:#6c7086;white-space:nowrap;font-size:13px}
+.fe{background:#313244;color:#a6adc8;padding:1px 8px;border-radius:4px;font-size:11px;font-family:monospace}
+.da{display:flex;gap:8px;align-items:center;margin-bottom:16px}.di{color:#6c7086;font-size:13px}
+.task{background:#1e1e2e;border-radius:10px;padding:16px;margin-bottom:10px}
+.th{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.tn{font-size:14px;font-weight:600}
+.bb{height:8px;background:#313244;border-radius:4px;overflow:hidden}.bf{height:100%;background:linear-gradient(90deg,#89b4fa,#74c7ec);border-radius:4px;transition:width .3s}
+.ts{font-size:12px;color:#a6adc8;margin-top:6px}.ts.complete{color:#a6e3a1}.ts.error{color:#f38ba8}.ts.interrupted{color:#f9e2af}
+.st{font-size:16px;color:#a6adc8;margin-bottom:12px;border-bottom:1px solid #313244;padding-bottom:8px;display:flex;justify-content:space-between}
+.ml{list-style:none}.mli{display:flex;justify-content:space-between;padding:12px 16px;background:#1e1e2e;border-radius:8px;margin-bottom:6px;font-size:14px}
+.ms{color:#6c7086;white-space:nowrap;margin-left:12px}
+.empty{color:#6c7086;text-align:center;padding:32px;font-size:14px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid #313244;border-top-color:#89b4fa;border-radius:50%;animation:sp .8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+</style></head><body>
+<div class="c">
+<h1>Model Downloader</h1><p class="sub">HuggingFace model browser &amp; direct URL downloads</p>
+<div class="nav"><a href="http://wickerman.local">&larr; Dashboard</a></div>
+<div class="tabs">
+<div class="tab active" data-tab="hf" onclick="sw('hf')">HuggingFace</div>
+<div class="tab" data-tab="url" onclick="sw('url')">Direct URL</div>
+<div class="tab" data-tab="dl" onclick="sw('dl')">Downloads</div>
+<div class="tab" data-tab="lib" onclick="sw('lib')">Library</div>
+</div>
+<div id="t-hf" class="tc active">
+<div class="sf"><input type="text" id="hfQ" placeholder="TheBloke/Mistral-7B-v0.2-GGUF or paste HF URL"><button id="hfB" onclick="hfLookup()">Browse Files</button></div>
+<div id="hfR"></div>
+</div>
+<div id="t-url" class="tc">
+<div class="sf"><input type="text" id="urlI" placeholder="https://huggingface.co/.../resolve/main/model.gguf"><button onclick="directDL()">Download</button></div>
+</div>
+<div id="t-dl" class="tc">
+<div class="st"><span>Active Downloads</span><button class="btn2 btns" onclick="clearDone()">Clear Completed</button></div>
+<div id="tasks"></div>
+</div>
+<div id="t-lib" class="tc">
+<div class="st">Downloaded Models</div>
+<ul class="ml" id="models"></ul>
+</div>
+</div>
+<script>
+function sw(n){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===n));document.querySelectorAll('.tc').forEach(t=>t.classList.toggle('active',t.id==='t-'+n))}
+function hs(b){if(!b)return"?";const u=["B","KB","MB","GB","TB"];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++}return b.toFixed(i>0?1:0)+" "+u[i]}
+let hfF=[],hfR="";
+async function hfLookup(){const i=document.getElementById("hfQ"),b=document.getElementById("hfB"),q=i.value.trim();if(!q)return;b.disabled=true;b.innerHTML='<span class="spin"></span> Looking up...';document.getElementById("hfR").innerHTML="";try{const r=await fetch("/api/hf/lookup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q})});const d=await r.json();if(d.error){document.getElementById("hfR").innerHTML=`<div class="empty" style="color:#f38ba8">${d.error}</div>`;return}hfF=d.files;hfR=d.repo_id;renderHF(d)}catch(e){document.getElementById("hfR").innerHTML=`<div class="empty" style="color:#f38ba8">Failed: ${e}</div>`}finally{b.disabled=false;b.textContent="Browse Files"}}
+function renderHF(d){const cats={gguf:"GGUF Quantizations",quantized:"Quantized",weights:"Model Weights",tokenizer:"Tokenizer",config:"Config",other:"Other"};let h=`<div class="mi"><h2>${d.model_name}</h2>`;if(d.tags.length)h+=`<div class="tags">${d.tags.map(t=>`<span class="tg">${t}</span>`).join("")}</div>`;h+=`<div style="color:#6c7086;font-size:13px">Total: ${d.total_size} across ${d.files.length} files</div></div>`;h+=`<div class="da"><button class="btn" onclick="dlSel()">Download Selected</button><button class="btn btn2" onclick="selGGUF()">Select GGUF</button><button class="btn btn2" onclick="selNone()">Select None</button><span class="di" id="si">0 selected</span></div>`;h+='<div>';let lc="";d.files.forEach((f,i)=>{if(f.category!==lc){lc=f.category;h+=`<div class="fcat">${cats[f.category]||f.category}</div>`}h+=`<div class="fi"><input type="checkbox" data-i="${i}" onchange="upd()"><span class="fe">${f.ext||"?"}</span><span class="fn">${f.name}</span><span class="fs">${f.size_h}</span></div>`});h+='</div>';document.getElementById("hfR").innerHTML=h}
+function gc(){return[...document.querySelectorAll('#hfR input[type=checkbox]:checked')].map(c=>hfF[c.dataset.i])}
+function upd(){const s=gc(),t=s.reduce((a,f)=>a+f.size,0);document.getElementById("si").textContent=`${s.length} file${s.length!==1?"s":""} (${hs(t)})`}
+function selGGUF(){document.querySelectorAll('#hfR input[type=checkbox]').forEach(c=>{c.checked=hfF[c.dataset.i].category==="gguf"});upd()}
+function selNone(){document.querySelectorAll('#hfR input[type=checkbox]').forEach(c=>c.checked=false);upd()}
+async function dlSel(){const s=gc();if(!s.length){alert("Select files first");return}try{await fetch("/api/download/batch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({files:s,subfolder:hfR.replace("/","_")})});sw("dl")}catch(e){alert("Failed: "+e)}}
+async function directDL(){const i=document.getElementById("urlI"),u=i.value.trim();if(!u)return;try{const r=await fetch("/api/download",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});const d=await r.json();if(d.error){alert(d.error);return}i.value="";sw("dl")}catch(e){alert("Failed: "+e)}}
+async function poll(){try{const a=await(await fetch("/api/status")).json();const el=document.getElementById("tasks");const e=Object.entries(a);if(!e.length){el.innerHTML='<div class="empty">No downloads</div>';return}const newIds=new Set(e.map(([t])=>t));el.querySelectorAll('[data-tid]').forEach(n=>{if(!newIds.has(n.dataset.tid))n.remove()});for(const[t,i]of e){const p=i.total?Math.round(i.downloaded/i.total*100):0;const sc=["complete","error","interrupted"].includes(i.status)?i.status:"";const st=i.status==="downloading"?hs(i.downloaded)+" / "+hs(i.total):i.status==="error"?"Error: "+(i.error||"?"):i.status;let node=el.querySelector(`[data-tid="${t}"]`);if(!node){node=document.createElement('div');node.className='task';node.dataset.tid=t;el.appendChild(node)}node.innerHTML=`<div class="th"><span class="tn">${i.filename||t}</span><span>${i.status==="downloading"?p+"%":""}</span></div>${i.status==="downloading"?`<div class="bb"><div class="bf" style="width:${p}%"></div></div>`:""}<div class="ts ${sc}">${st}</div>`}}catch(e){}}
+async function pollM(){try{const f=await(await fetch("/api/models")).json();document.getElementById("models").innerHTML=f.length?f.map(f=>`<li class="mli"><span>${f.name}</span><span class="ms">${f.size_h}</span></li>`).join(""):"<li class='empty'>No models yet.</li>"}catch(e){}}
+async function clearDone(){try{await fetch("/api/clear_completed",{method:"POST"});poll()}catch(e){}}
+poll();pollM();setInterval(poll,2000);setInterval(pollM,10000);
+document.getElementById("hfQ").addEventListener("keydown",e=>{if(e.key==="Enter")hfLookup()});
+document.getElementById("urlI").addEventListener("keydown",e=>{if(e.key==="Enter")directDL()});
+</script></body></html>

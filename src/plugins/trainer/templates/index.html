@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wickerman Trainer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{background:#11111b;color:#cdd6f4;font-family:system-ui,sans-serif;padding:24px}
+.c{max-width:800px;margin:0 auto}h1{text-align:center;color:#89b4fa;margin-bottom:4px}.sub{text-align:center;color:#6c7086;margin-bottom:24px;font-size:14px}
+.card{background:#1e1e2e;border-radius:10px;padding:20px;margin-bottom:16px}
+.card h2{font-size:16px;color:#89b4fa;margin-bottom:12px}
+label{display:block;color:#6c7086;font-size:13px;margin:8px 0 4px}
+select,input{width:100%;background:#11111b;border:1px solid #313244;color:#cdd6f4;padding:10px;border-radius:6px;font-size:14px;outline:none}
+select:focus,input:focus{border-color:#89b4fa}
+.row{display:flex;gap:12px}.row>*{flex:1}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;margin-top:16px}
+.btn.primary{background:#89b4fa;color:#1e1e2e}.btn.primary:hover{background:#74c7ec}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.log{background:#000;color:#a6e3a1;font-family:monospace;font-size:12px;padding:12px;border-radius:6px;height:200px;overflow-y:auto;white-space:pre-wrap;margin-top:12px}
+.status{display:inline-block;padding:4px 12px;border-radius:12px;font-size:13px;font-weight:600}
+.status.idle{background:#313244;color:#6c7086}.status.training{background:#2e2a1e;color:#f9e2af}.status.complete{background:#1e3a2e;color:#a6e3a1}.status.error{background:#302030;color:#f38ba8}
+</style></head><body>
+<div class="c">
+<h1>Model Trainer</h1><p class="sub">LoRA fine-tuning with Unsloth</p>
+<div class="card">
+<h2>Configuration</h2>
+<label>Base Model</label><select id="model"><option value="">Loading models...</option></select>
+<label>Dataset</label><select id="dataset"><option value="">Loading datasets...</option></select>
+<div class="row"><div><label>Epochs</label><input id="epochs" type="number" value="3" min="1"></div>
+<div><label>Learning Rate</label><input id="lr" type="number" value="0.0002" step="0.0001"></div>
+<div><label>LoRA Rank</label><input id="rank" type="number" value="16" min="4" max="128"></div></div>
+<div class="row"><div><label>Batch Size</label><input id="batch" type="number" value="2" min="1"></div>
+<div><label>Max Seq Length</label><input id="seqlen" type="number" value="2048" step="256"></div>
+<div><label>Output Name</label><input id="outname" placeholder="auto"></div></div>
+<button class="btn primary" id="trainBtn" onclick="startTrain()">Start Training</button>
+</div>
+<div class="card">
+<h2>Status <span class="status idle" id="st">idle</span></h2>
+<div class="log" id="log">Ready.</div>
+</div>
+<div class="card"><h2>Saved LoRAs</h2><div id="loras">Loading...</div></div>
+</div>
+<script>
+async function loadModels(){try{const r=await(await fetch('/api/models')).json();const s=document.getElementById('model');s.innerHTML=r.length?r.map(m=>`<option value="${m.name}">${m.name} (${m.size_mb}MB)</option>`).join(''):'<option>No models found</option>'}catch(e){}}
+async function loadDatasets(){try{const r=await(await fetch('/api/datasets')).json();const s=document.getElementById('dataset');s.innerHTML=r.length?r.map(d=>`<option value="${d.name}">${d.name} (${d.size_mb}MB)</option>`).join(''):'<option>No datasets found</option>'}catch(e){}}
+async function loadLoras(){try{const r=await(await fetch('/api/loras')).json();document.getElementById('loras').innerHTML=r.length?r.map(l=>`<div style="padding:8px;background:#11111b;border-radius:6px;margin:4px 0">${l.name}</div>`).join(''):'<div style="color:#6c7086">None yet</div>'}catch(e){}}
+async function startTrain(){const cfg={base_model:document.getElementById('model').value,dataset:document.getElementById('dataset').value,
+epochs:parseInt(document.getElementById('epochs').value),learning_rate:parseFloat(document.getElementById('lr').value),
+lora_r:parseInt(document.getElementById('rank').value),batch_size:parseInt(document.getElementById('batch').value),
+max_seq_length:parseInt(document.getElementById('seqlen').value),output_name:document.getElementById('outname').value||undefined};
+if(!cfg.base_model||!cfg.dataset){alert('Select a model and dataset');return}
+document.getElementById('trainBtn').disabled=true;
+try{const r=await fetch('/api/train',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
+const d=await r.json();if(d.error)alert(d.error)}catch(e){alert('Error: '+e)}}
+async function poll(){try{const r=await(await fetch('/api/status')).json();const st=document.getElementById('st');
+st.textContent=r.status;st.className='status '+r.status;
+const lg=document.getElementById('log');const newLines=r.log.slice(window._lastLogLen||0);if(newLines.length){lg.textContent+=newLines.join('\n')+'\n';lg.scrollTop=99999}window._lastLogLen=r.log.length;if(r.status==='idle'&&!r.log.length){lg.textContent='Ready.';window._lastLogLen=0}
+document.getElementById('log').scrollTop=99999;
+document.getElementById('trainBtn').disabled=r.status==='training';
+if(r.status==='complete'||r.status==='error')loadLoras()}catch(e){}}
+loadModels();loadDatasets();loadLoras();setInterval(poll,2000);
+</script></body></html>

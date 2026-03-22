@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Model Router</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#11111b;--surface:#181825;--overlay:#1e1e2e;--border:#313244;--text:#cdd6f4;--subtext:#6c7086;--blue:#89b4fa;--green:#a6e3a1;--red:#f38ba8;--yellow:#f9e2af;--mauve:#cba6f7;--teal:#94e2d5;--peach:#fab387;--mono:'Courier New',monospace}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
+.topbar{padding:12px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.topbar .logo{display:flex;align-items:center;gap:10px}
+.topbar .logo .icon{width:28px;height:28px;background:var(--blue);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--bg);font-weight:700}
+.topbar .logo span{font-size:16px;font-weight:700;color:var(--blue);letter-spacing:.5px}
+.topbar .gpu-info{font-size:12px;font-family:var(--mono);color:var(--subtext);display:flex;align-items:center;gap:8px}
+.topbar .gpu-info .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.vram-bar{padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+.vram-bar .lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--subtext);margin-bottom:4px}
+.vram-bar .bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;display:flex}
+.vram-bar .legend{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap}
+.vram-bar .legend span{font-size:10px;display:flex;align-items:center;gap:4px;color:var(--subtext)}
+.vram-bar .legend .sw{width:8px;height:8px;border-radius:2px;display:inline-block}
+.content{padding:20px 24px;max-width:1200px;margin:0 auto}
+.sec{font-size:11px;color:var(--subtext);text-transform:uppercase;letter-spacing:1px;margin:0 0 12px}
+.loaded-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-bottom:28px}
+.card{background:var(--overlay);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card.active{border-color:var(--blue)}
+.card .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.card .name{font-size:15px;font-weight:600}
+.card .name.blue{color:var(--blue)}
+.card .fname{font-size:11px;color:var(--subtext);margin-top:2px}
+.badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.badge{font-size:10px;padding:2px 8px;border-radius:10px}
+.badge.ready{background:rgba(166,227,161,.12);color:var(--green)}
+.badge.loading{background:rgba(249,226,175,.12);color:var(--yellow)}
+.badge.error{background:rgba(243,139,168,.12);color:var(--red)}
+.badge.gpu{background:rgba(137,180,250,.12);color:var(--blue)}
+.badge.cpu{background:rgba(108,112,134,.2);color:var(--subtext)}
+.badge.remote{background:rgba(203,166,247,.12);color:var(--mauve)}
+.badge.rag{background:rgba(148,226,213,.12);color:var(--teal)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:12px}
+.stat{background:var(--bg);padding:8px 10px;border-radius:6px}
+.stat .l{color:var(--subtext);font-size:10px;margin-bottom:2px}
+.stat .v{font-family:var(--mono)}
+.prompt-preview{background:var(--bg);padding:8px 10px;border-radius:6px;font-size:11px;color:var(--subtext);margin-bottom:12px;max-height:60px;overflow:hidden;font-style:italic}
+.actions{display:flex;gap:8px}
+.btn{flex:1;padding:7px;text-align:center;border-radius:6px;border:1px solid;font-size:12px;cursor:pointer;background:transparent;color:inherit;font-family:inherit}
+.btn-danger{border-color:rgba(243,139,168,.3);color:var(--red)}
+.btn-danger:hover{background:rgba(243,139,168,.1)}
+.btn-muted{border-color:rgba(49,50,68,.5);color:var(--subtext)}
+.btn-muted:hover{background:rgba(49,50,68,.3)}
+.btn-primary{border-color:var(--blue);background:var(--blue);color:var(--bg);font-weight:600;font-size:13px}
+.btn-primary:hover{opacity:.9}
+.btn-mauve{border-color:var(--mauve);background:var(--mauve);color:var(--bg);font-weight:600;font-size:13px}
+.avail-card{background:var(--overlay);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.avail-hdr{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.avail-hdr:hover{background:rgba(49,50,68,.3)}
+.avail-hdr .info .name{font-size:14px;font-weight:500}
+.avail-hdr .info .meta{font-size:11px;color:var(--subtext);margin-top:2px}
+.avail-cfg{padding:0 16px 16px;display:none}
+.avail-cfg.open{display:block}
+.sgrid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;font-size:12px;margin-bottom:10px}
+.sgrid.c2{grid-template-columns:1fr 1fr}
+.sgrid.c3{grid-template-columns:1fr 1fr 1fr}
+.si{background:var(--bg);padding:8px 10px;border-radius:6px}
+.si .l{color:var(--subtext);font-size:10px;margin-bottom:4px}
+.si input,.si select,.si textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:5px 8px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none}
+.si input:focus,.si select:focus,.si textarea:focus{border-color:var(--blue)}
+.si textarea{font-family:inherit;height:60px;resize:vertical}
+.toggle-group{display:flex;gap:0;border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+.toggle-group .opt{flex:1;padding:5px;text-align:center;font-size:11px;cursor:pointer;background:var(--surface);color:var(--subtext)}
+.toggle-group .opt.active{background:var(--blue);color:var(--bg);font-weight:500}
+.adv-toggle{font-size:11px;color:var(--blue);cursor:pointer;margin:8px 0 10px;display:inline-block}
+.adv{display:none}.adv.open{display:block}
+.provider-form{background:var(--overlay);border:1px solid var(--mauve);border-radius:10px;padding:16px;margin-bottom:12px}
+.provider-form .title{font-size:14px;font-weight:600;color:var(--mauve);margin-bottom:12px}
+.empty{padding:40px;text-align:center;color:var(--subtext);font-size:14px}
+.tab-row{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid var(--border)}
+.tab{padding:10px 20px;font-size:13px;cursor:pointer;color:var(--subtext);border-bottom:2px solid transparent}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-content{display:none}.tab-content.active{display:block}
+</style></head><body>
+<div class="topbar">
+  <div class="logo"><div class="icon">R</div><span>MODEL ROUTER</span></div>
+  <div class="gpu-info"><span class="dot" id="gpuDot" style="background:var(--subtext)"></span><span id="gpuInfo">Detecting...</span></div>
+</div>
+<div class="vram-bar" id="vramSection">
+  <div class="lbl"><span>VRAM USAGE</span><span id="vramText">--</span></div>
+  <div class="bar" id="vramBarInner"></div>
+  <div class="legend" id="vramLegend"></div>
+</div>
+<div class="content">
+  <div class="sec" id="loadedLabel">Loaded agents</div>
+  <div class="loaded-grid" id="loadedGrid"></div>
+  <div class="tab-row">
+    <div class="tab active" onclick="showTab('local')">Local models</div>
+    <div class="tab" onclick="showTab('remote')">Remote providers</div>
+  </div>
+  <div class="tab-content active" id="tab-local">
+    <div id="availList"></div>
+  </div>
+  <div class="tab-content" id="tab-remote">
+    <div class="provider-form" id="providerForm">
+      <div class="title">Add remote provider</div>
+      <div class="sgrid c2">
+        <div class="si"><div class="l">Provider type</div><select id="pType"><option value="openai">OpenAI-compatible</option><option value="anthropic">Anthropic</option><option value="google">Google Gemini</option><option value="custom">Custom endpoint</option></select></div>
+        <div class="si"><div class="l">Alias</div><input id="pAlias" placeholder="e.g. gpt4-analyst"></div>
+      </div>
+      <div class="sgrid c2">
+        <div class="si"><div class="l">API base URL</div><input id="pBase" placeholder="https://api.openai.com/v1"></div>
+        <div class="si"><div class="l">Model name</div><input id="pModel" placeholder="gpt-4o"></div>
+      </div>
+      <div class="sgrid c2">
+        <div class="si"><div class="l">API key</div><input id="pKey" type="password" placeholder="sk-..."></div>
+        <div class="si"><div class="l">System prompt</div><textarea id="pSysPrompt" placeholder="You are a helpful assistant..."></textarea></div>
+      </div>
+      <div class="sgrid c3">
+        <div class="si"><div class="l">Temperature</div><input id="pTemp" value="0.7" type="number" min="0" max="2" step="0.05"></div>
+        <div class="si"><div class="l">Max tokens</div><input id="pMaxTok" value="4096" type="number" min="1" step="64"></div>
+        <div class="si"><div class="l">RAG</div><label style="display:flex;align-items:center;gap:6px;padding-top:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="pRag" style="width:auto"> Enabled</label></div>
+      </div>
+      <div style="margin-top:10px"><button class="btn btn-mauve" style="width:100%" onclick="addProvider()">Add provider</button></div>
+    </div>
+    <div id="remoteList"></div>
+  </div>
+</div>
+<script>
+const API=window.location.origin;
+const COLORS=['#89b4fa','#a6e3a1','#cba6f7','#f9e2af','#94e2d5','#f38ba8','#fab387'];
+let vramInfo={total_mb:0,used_mb:0,free_mb:0,gpu_name:''};
+let slotsData={},modelsData=[];
+let expandedCards={},advancedOpen={};
+function showTab(t){document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));document.querySelector('.tab-content#tab-'+t).classList.add('active');event.target.classList.add('active')}
+async function refresh(){try{const[sr,mr,vr]=await Promise.all([fetch(API+'/api/status'),fetch(API+'/api/models'),fetch(API+'/api/vram')]);const status=await sr.json();const models=await mr.json();vramInfo=await vr.json();slotsData=status.slots||{};modelsData=models.models||[];renderGpu();renderVram();renderLoaded();if(!Object.values(expandedCards).some(v=>v))renderAvailable();renderRemote()}catch(e){}}
+function renderGpu(){const d=document.getElementById('gpuDot'),i=document.getElementById('gpuInfo');if(vramInfo.total_mb>0){d.style.background='var(--green)';i.textContent=vramInfo.gpu_name+' \u2014 '+Math.round(vramInfo.total_mb).toLocaleString()+' MB'}else{d.style.background='var(--red)';i.textContent='No GPU detected'}}
+function renderVram(){const bar=document.getElementById('vramBarInner'),text=document.getElementById('vramText'),legend=document.getElementById('vramLegend');if(vramInfo.total_mb<=0){text.textContent='N/A';return}text.textContent=vramInfo.used_mb.toLocaleString()+' / '+vramInfo.total_mb.toLocaleString()+' MB ('+Math.round(vramInfo.used_mb/vramInfo.total_mb*100)+'%)';let bh='',lh='';let ci=0;Object.entries(slotsData).forEach(([a,s])=>{if(s.type==='local'&&s.vram_est_mb){const w=Math.max(1,s.vram_est_mb/vramInfo.total_mb*100);const c=COLORS[ci++%COLORS.length];bh+='<div style="width:'+w+'%;background:'+c+'"></div>';lh+='<span><span class="sw" style="background:'+c+'"></span>'+a+' \u2014 '+s.vram_est_mb.toLocaleString()+' MB</span>'}});bar.innerHTML=bh;legend.innerHTML=lh}
+function renderLoaded(){const grid=document.getElementById('loadedGrid'),label=document.getElementById('loadedLabel');const entries=Object.entries(slotsData);if(!entries.length){grid.innerHTML='<div class="empty">No agents loaded. Configure a model below or add a remote provider.</div>';label.textContent='Loaded agents';return}label.textContent='Loaded agents ('+entries.length+')';grid.innerHTML=entries.map(([a,s],i)=>{const isLocal=s.type==='local';const isGpu=isLocal&&parseInt(s.settings?.gpu_layers||'99')>0;const sc=s.status==='ready'?'ready':s.status==='loading'?'loading':'error';const prompt=s.system_prompt||'';const hasRag=s.rag_enabled;return'<div class="card'+(s.status==='ready'?' active':'')+'"><div class="hdr"><div><div class="name'+(s.status==='ready'?' blue':'')+'">'+a+'</div><div class="fname">'+(isLocal?s.model_file:s.remote_model+' ('+s.provider_type+')')+'</div></div><div class="badges"><span class="badge '+sc+'">'+s.status+'</span>'+(isLocal?(isGpu?'<span class="badge gpu">GPU</span>':'<span class="badge cpu">CPU</span>'):'<span class="badge remote">remote</span>')+(hasRag?'<span class="badge rag">RAG</span>':'')+'</div></div>'+(prompt?'<div class="prompt-preview">\u201c'+esc(prompt)+'\u201d</div>':'')+'<div class="stats">'+(isLocal?'<div class="stat"><div class="l">Context</div><div class="v">'+(s.settings?.ctx_size||'4096')+'</div></div><div class="stat"><div class="l">VRAM</div><div class="v">'+(s.vram_est_mb||0).toLocaleString()+' MB</div></div>':'<div class="stat"><div class="l">Temp</div><div class="v">'+(s.settings?.temperature||'0.7')+'</div></div><div class="stat"><div class="l">Max tokens</div><div class="v">'+(s.settings?.max_tokens||'4096')+'</div></div>')+'</div><div class="actions"><button class="btn btn-danger" onclick="doUnload(\''+a+'\')">Unload</button></div></div>'}).join('')}
+function renderAvailable(){const el=document.getElementById('availList');const avail=modelsData.filter(m=>!m.loaded);if(!avail.length){el.innerHTML=modelsData.length?'<div class="empty">All local models loaded.</div>':'<div class="empty">No .gguf files found in models directory.</div>';return}el.innerHTML=avail.map(m=>{const isOpen=expandedCards[m.name];const id=m.name.replace(/[^a-zA-Z0-9]/g,'_');return'<div class="avail-card"><div class="avail-hdr" onclick="toggleCfg(\''+m.name+'\')"><div class="info"><div class="name">'+m.auto_name+'</div><div class="meta">'+m.name+' \u2014 '+m.size+' (~'+m.estimated_vram_mb.toLocaleString()+' MB)</div></div><button class="btn btn-muted" style="flex:none;width:auto;padding:7px 16px" onclick="event.stopPropagation();toggleCfg(\''+m.name+'\')">'+(isOpen?'Collapse':'Configure')+'</button></div><div class="avail-cfg'+(isOpen?' open':'')+'">'+renderModelSettings(m)+'</div></div>'}).join('')}
+function renderModelSettings(m){const id=m.name.replace(/[^a-zA-Z0-9]/g,'_');const free=vramInfo.free_mb;const fits=m.estimated_vram_mb<free;return'<div class="si" style="margin-bottom:10px"><div class="l">System prompt</div><textarea id="s_prompt_'+id+'" placeholder="Define this agent\'s identity and behavior..."></textarea></div><div class="sgrid"><div class="si"><div class="l">Context size</div><input id="s_ctx_'+id+'" value="4096" type="number" min="128" step="256"></div><div class="si"><div class="l">GPU layers</div><input id="s_ngl_'+id+'" value="99" type="number"></div><div class="si"><div class="l">Threads</div><input id="s_threads_'+id+'" value="" placeholder="auto"></div><div class="si"><div class="l">Alias</div><input id="s_alias_'+id+'" value="'+m.auto_name+'"></div></div><div class="sgrid c2"><div class="si"><div class="l">Offload mode</div><div class="toggle-group" id="s_offload_'+id+'"><div class="opt active" onclick="setOff(\''+id+'\',\'gpu\',this)">GPU</div><div class="opt" onclick="setOff(\''+id+'\',\'cpu\',this)">CPU only</div><div class="opt" onclick="setOff(\''+id+'\',\'split\',this)">Split</div></div></div><div class="si"><div class="l">Est. VRAM</div><div style="font-family:var(--mono);color:var(--yellow);font-size:14px;padding-top:4px">~'+m.estimated_vram_mb.toLocaleString()+' MB</div><div style="font-size:10px;color:var(--subtext);margin-top:2px">'+(fits?free.toLocaleString()+' MB free \u2014 should fit':free.toLocaleString()+' MB free \u2014 may not fit')+'</div></div></div><div class="sgrid c3"><div class="si"><div class="l">Temperature</div><input id="s_temp_'+id+'" value="0.7" type="number" min="0" max="2" step="0.05"></div><div class="si"><div class="l">Top P</div><input id="s_topp_'+id+'" value="0.95" type="number" min="0" max="1" step="0.05"></div><div class="si"><div class="l">RAG memory</div><label style="display:flex;align-items:center;gap:6px;padding-top:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="s_rag_'+id+'" checked style="width:auto"> Enabled</label></div></div><span class="adv-toggle" onclick="toggleAdv(\''+id+'\')">Advanced settings \u25BC</span><div class="adv'+(advancedOpen[id]?' open':'')+'" id="adv_'+id+'"><div class="sgrid"><div class="si"><div class="l">Batch size</div><input id="s_batch_'+id+'" value="" placeholder="2048"></div><div class="si"><div class="l">Flash attention</div><select id="s_fa_'+id+'"><option value="">auto</option><option value="true">on</option></select></div><div class="si"><div class="l">KV cache (K)</div><select id="s_ctk_'+id+'"><option value="">f16</option><option value="q8_0">q8_0</option><option value="q4_0">q4_0</option></select></div><div class="si"><div class="l">Seed</div><input id="s_seed_'+id+'" value="" placeholder="-1"></div></div></div><div style="margin-top:12px"><button class="btn btn-primary" onclick="doLoad(\''+m.name+'\',\''+id+'\')">Load agent</button></div>'}
+function renderRemote(){const el=document.getElementById('remoteList');const remote=Object.entries(slotsData).filter(([a,s])=>s.type!=='local');if(!remote.length){el.innerHTML='<div class="empty" style="padding:20px">No remote providers configured.</div>';return}el.innerHTML='<div class="sec">Active remote agents</div>'+remote.map(([a,s])=>'<div class="card" style="margin-bottom:12px"><div class="hdr"><div><div class="name" style="color:var(--mauve)">'+a+'</div><div class="fname">'+s.remote_model+' ('+s.provider_type+')</div></div><div class="badges"><span class="badge ready">ready</span><span class="badge remote">remote</span>'+(s.rag_enabled?'<span class="badge rag">RAG</span>':'')+'</div></div>'+(s.system_prompt?'<div class="prompt-preview">\u201c'+esc(s.system_prompt)+'\u201d</div>':'')+'<div class="actions"><button class="btn btn-danger" onclick="doUnload(\''+a+'\')">Remove</button></div></div>').join('')}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function toggleCfg(n){expandedCards[n]=!expandedCards[n];renderAvailable()}
+function toggleAdv(id){advancedOpen[id]=!advancedOpen[id];const el=document.getElementById('adv_'+id);if(el)el.classList.toggle('open')}
+function setOff(id,mode,el){const g=document.getElementById('s_offload_'+id);g.querySelectorAll('.opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');const ngl=document.getElementById('s_ngl_'+id);if(mode==='cpu')ngl.value='0';else if(mode==='gpu')ngl.value='99';else ngl.value='20'}
+function getVal(id){const e=document.getElementById(id);return e?e.value.trim():''}
+async function doLoad(filename,id){const alias=getVal('s_alias_'+id)||null;const settings={};if(getVal('s_ctx_'+id))settings.ctx_size=getVal('s_ctx_'+id);if(getVal('s_ngl_'+id))settings.gpu_layers=getVal('s_ngl_'+id);if(getVal('s_threads_'+id))settings.threads=getVal('s_threads_'+id);if(getVal('s_temp_'+id))settings.temperature=getVal('s_temp_'+id);if(getVal('s_topp_'+id))settings.top_p=getVal('s_topp_'+id);if(getVal('s_batch_'+id))settings.batch_size=getVal('s_batch_'+id);if(getVal('s_fa_'+id))settings.flash_attn=getVal('s_fa_'+id);if(getVal('s_ctk_'+id))settings.cache_type_k=getVal('s_ctk_'+id);if(getVal('s_seed_'+id))settings.seed=getVal('s_seed_'+id);const sysPrompt=getVal('s_prompt_'+id);const ragEnabled=document.getElementById('s_rag_'+id)?.checked??true;try{const r=await fetch(API+'/api/slots/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:filename,alias:alias,settings:settings,system_prompt:sysPrompt,rag_enabled:ragEnabled,rag_top_k:3})});const d=await r.json();if(!d.ok)alert('Load failed: '+(d.detail||d.error))}catch(e){alert('Load failed: '+e)}expandedCards={};advancedOpen={};setTimeout(refresh,2000);setTimeout(refresh,6000)}
+async function doUnload(alias){try{await fetch(API+'/api/slots/unload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({alias:alias})})}catch(e){alert('Unload failed: '+e)}setTimeout(refresh,500)}
+async function addProvider(){const alias=getVal('pAlias');const type=getVal('pType');const base=getVal('pBase');const model=getVal('pModel');const key=getVal('pKey');const sysPrompt=getVal('pSysPrompt');const temp=getVal('pTemp');const maxTok=getVal('pMaxTok');const ragEnabled=document.getElementById('pRag')?.checked??false;if(!alias||!base||!model){alert('Alias, API base, and model name are required');return}try{const r=await fetch(API+'/api/providers/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({alias:alias,type:type,api_base:base,api_key:key,remote_model:model,system_prompt:sysPrompt,settings:{temperature:parseFloat(temp)||0.7,max_tokens:parseInt(maxTok)||4096},rag_enabled:ragEnabled,rag_top_k:3})});const d=await r.json();if(!d.ok)alert('Failed: '+(d.detail||d.error));else{document.getElementById('pAlias').value='';document.getElementById('pKey').value='';document.getElementById('pModel').value='';document.getElementById('pSysPrompt').value=''}}catch(e){alert('Failed: '+e)}setTimeout(refresh,500)}
+refresh();setInterval(refresh,3000);
+</script></body></html>

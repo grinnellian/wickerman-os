@@ -92,7 +92,7 @@ def get_vram_info():
         if isinstance(gpu_name, bytes): gpu_name = gpu_name.decode()
         return {"gpu_name": gpu_name, "total_mb": mem.total // (1024*1024),
                 "used_mb": mem.used // (1024*1024), "free_mb": mem.free // (1024*1024)}
-    except: return {"gpu_name": "Unknown", "total_mb": 0, "used_mb": 0, "free_mb": 0}
+    except Exception: return {"gpu_name": "Unknown", "total_mb": 0, "used_mb": 0, "free_mb": 0}
 
 # ── Settings schema ──────────────────────────────────────────
 SETTINGS_SCHEMA = {
@@ -145,9 +145,17 @@ def _get_rag_db(index_id):
     idx_path = os.path.join(RAG_DIR, safe + ".faiss")
     db = sqlite3.connect(db_path)
     db.execute("CREATE TABLE IF NOT EXISTS chunks (id INTEGER PRIMARY KEY, text TEXT, timestamp REAL)")
+    db.execute("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT)")
     db.commit()
     if os.path.isfile(idx_path):
         index = faiss.read_index(idx_path)
+        # Validate stored dimension matches the index
+        row = db.execute("SELECT value FROM metadata WHERE key='embed_dim'").fetchone()
+        if row:
+            stored_dim = int(row[0])
+            if index.d != stored_dim:
+                print(f"[RAG] Dimension mismatch for {index_id}: index={index.d}, stored={stored_dim}. Rebuilding.", flush=True)
+                index = faiss.IndexIDMap(faiss.IndexFlatIP(stored_dim))
     else:
         index = faiss.IndexIDMap(faiss.IndexFlatIP(EMBED_DIM))
     return db, index, idx_path
@@ -171,8 +179,6 @@ def get_embedding(text):
         resp = urlopen(req, timeout=30)
         data = json.loads(resp.read())
         emb = data["data"][0]["embedding"]
-        global EMBED_DIM
-        if len(emb) != EMBED_DIM: EMBED_DIM = len(emb)
         return emb
     except Exception as e:
         print(f"[RAG] Embedding failed: {e}", flush=True)
@@ -222,15 +228,24 @@ def rag_archive(index_id, messages):
     chunks = chunk_messages(messages)
     db, index, idx_path = _get_rag_db(index_id)
     archived = 0
+    current_dim = None
     for chunk_text in chunks:
         vec = get_embedding(chunk_text)
         if vec is None: continue
         vec_np = np.array([vec], dtype=np.float32)
+        embed_dim = vec_np.shape[1]
+        # Rebuild index if embedding dimension changed
+        if index.d != embed_dim:
+            print(f"[RAG] Embedding dim changed {index.d} -> {embed_dim} for {index_id}. Rebuilding index.", flush=True)
+            index = faiss.IndexIDMap(faiss.IndexFlatIP(embed_dim))
+        current_dim = embed_dim
         faiss.normalize_L2(vec_np)
         db.execute("INSERT INTO chunks (text, timestamp) VALUES (?, ?)", (chunk_text, time.time()))
         sqlite_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
         index.add_with_ids(vec_np, np.array([sqlite_id], dtype=np.int64))
         archived += 1
+    if current_dim is not None:
+        db.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES ('embed_dim', ?)", (str(current_dim),))
     db.commit()
     db.close()
     tmp = idx_path + ".tmp"
@@ -273,7 +288,7 @@ def rag_status(index_id):
     try:
         idx = faiss.read_index(idx_path)
         return {"chunks": idx.ntotal}
-    except: return {"chunks": 0}
+    except Exception: return {"chunks": 0}
 
 # ── Slot Management ──────────────────────────────────────────
 def load_model(model_file, alias=None, settings=None, system_prompt="", rag_enabled=True, rag_top_k=3):
@@ -326,7 +341,7 @@ def load_model(model_file, alias=None, settings=None, system_prompt="", rag_enab
                     print(f"[ROUTER] '{alias}' ready on port {port}", flush=True)
                     _save_config()
                     return
-            except: pass
+            except Exception: pass
             if proc.poll() is not None:
                 slot["status"] = "error"
                 slot["detail"] = f"Crashed (exit {proc.returncode})"
@@ -367,7 +382,7 @@ def unload_model(alias):
                 print(f"[ROUTER] Unloading '{alias}' (pid {proc.pid})", flush=True)
                 proc.terminate()
                 try: proc.wait(timeout=10)
-                except: proc.kill()
+                except Exception: proc.kill()
         del _slots[alias]
     _save_config()
     print(f"[ROUTER] '{alias}' unloaded", flush=True)
@@ -580,14 +595,14 @@ def _load_config():
     try:
         if os.path.isfile(CONFIG_FILE):
             with open(CONFIG_FILE) as f: return json.load(f)
-    except: pass
+    except Exception: pass
     return None
 
 def _load_provider_keys():
     try:
         if os.path.isfile(PROVIDERS_FILE):
             with open(PROVIDERS_FILE) as f: return json.load(f)
-    except: pass
+    except Exception: pass
     return {}
 
 # ── Zombie Cleanup ───────────────────────────────────────────
@@ -602,12 +617,20 @@ def _kill_all_slots():
 atexit.register(_kill_all_slots)
 
 # ── HTTP Handler ─────────────────────────────────────────────
+ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost,http://127.0.0.1,http://wickerman.local").split(",")
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass
 
+    def _cors_origin(self):
+        origin = self.headers.get("Origin", "")
+        if origin and any(origin.startswith(ao.strip()) for ao in ALLOWED_ORIGINS):
+            return origin
+        return ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "http://localhost"
+
     def do_OPTIONS(self):
         self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Origin', self._cors_origin())
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.end_headers()
@@ -685,7 +708,11 @@ class Handler(BaseHTTPRequestHandler):
             self._serve_file(os.path.join(PUBLIC_DIR, 'index.html'), 'text/html')
         else:
             safe = self.path.lstrip('/')
-            fpath = os.path.join(PUBLIC_DIR, safe)
+            fpath = os.path.realpath(os.path.join(PUBLIC_DIR, safe))
+            if not fpath.startswith(os.path.realpath(PUBLIC_DIR)):
+                self.send_response(403)
+                self.end_headers()
+                return
             if os.path.isfile(fpath):
                 ct = 'text/html'
                 if fpath.endswith('.js'): ct = 'application/javascript'
@@ -708,7 +735,7 @@ class Handler(BaseHTTPRequestHandler):
             data = resp.read()
             self.send_response(resp.status)
             self.send_header('Content-Type', resp.headers.get('Content-Type', 'application/json'))
-            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Origin', self._cors_origin())
             self.end_headers()
             self.wfile.write(data)
         except URLError as e:
@@ -798,7 +825,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 d = json.loads(body) if body else {}
                 model_name = d.get("model", "embedding")
-            except: model_name = "embedding"
+            except Exception: model_name = "embedding"
             slot, err = _resolve_model(model_name)
             if not slot: slot, err = _resolve_model("default")
             if slot and slot.get("type") == "local":
@@ -809,7 +836,7 @@ class Handler(BaseHTTPRequestHandler):
                     data = resp.read()
                     self.send_response(resp.status)
                     self.send_header('Content-Type', 'application/json')
-                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Access-Control-Allow-Origin', self._cors_origin())
                     self.end_headers()
                     self.wfile.write(data)
                 except URLError as e:
@@ -836,7 +863,7 @@ class Handler(BaseHTTPRequestHandler):
                 result = route_chat(slot, messages, req_settings)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Access-Control-Allow-Origin', self._cors_origin())
                 self.end_headers()
                 self.wfile.write(json.dumps(result).encode())
             except Exception as e:
@@ -846,7 +873,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 d = json.loads(body) if body else {}
                 model_name = d.get("model", "default")
-            except: model_name = "default"
+            except Exception: model_name = "default"
             slot, err = _resolve_model(model_name)
             if slot and slot.get("type") == "local":
                 url = f"http://127.0.0.1:{slot['port']}{self.path}"
@@ -856,7 +883,7 @@ class Handler(BaseHTTPRequestHandler):
                     data = resp.read()
                     self.send_response(resp.status)
                     self.send_header('Content-Type', 'application/json')
-                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Access-Control-Allow-Origin', self._cors_origin())
                     self.end_headers()
                     self.wfile.write(data)
                 except URLError as e:
@@ -870,7 +897,7 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, code, data):
         self.send_response(code)
         self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Origin', self._cors_origin())
         self.end_headers()
         try: self.wfile.write(json.dumps(data).encode())
         except BrokenPipeError: pass

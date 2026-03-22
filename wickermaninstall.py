@@ -287,7 +287,7 @@ services:
     image: nginx:alpine
     container_name: wm-gateway
     labels: [wickerman.managed=true]
-    ports: ["80:80"]
+    ports: ["127.0.0.1:80:80"]
     volumes: ["{INSTALL_DIR}/nginx/nginx.conf:/etc/nginx/nginx.conf:ro"]
     depends_on: [core, downloader]
     restart: unless-stopped

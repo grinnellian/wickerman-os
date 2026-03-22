@@ -29,7 +29,7 @@ def list_conversations():
         try:
             with open(p) as f: c = json.load(f)
             convs.append({"id": c["id"], "title": c.get("title","Untitled"), "agent": c.get("agent","default"), "created": c.get("created",0), "message_count": len(c.get("messages",[]))})
-        except: pass
+        except Exception: pass
     convs.sort(key=lambda c: c.get("created",0), reverse=True)
     return convs
 
@@ -51,7 +51,7 @@ def api_agents():
     try:
         r = requests.get(LLAMA_API + "/v1/models", timeout=5)
         return jsonify(r.json())
-    except: return jsonify({"data": []})
+    except Exception: return jsonify({"data": []})
 
 @app.route("/api/conversations", methods=["GET"])
 def api_list_convs(): return jsonify({"conversations": list_conversations()})

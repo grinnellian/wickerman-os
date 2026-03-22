@@ -18,7 +18,8 @@ PLUGINS=$(docker ps -q --filter name="wm-*")
 if [ -n "$PLUGINS" ]; then
     echo "🛑 Stopping plugins..."
     docker stop $PLUGINS
-    echo "✓ Plugins stopped."
+    docker rm $PLUGINS 2>/dev/null
+    echo "✓ Plugins stopped and removed."
 else
     echo "✓ No active plugins found."
 fi

@@ -95,7 +95,12 @@ def export_project():
     files = d.get("files", [])
     if not files: return jsonify({"error": "No files specified"}), 400
     zip_path = os.path.join("/tmp", f"{project_name}.zip")
-    shutil.make_archive(zip_path.replace(".zip",""), "zip", WORKSPACE)
+    import zipfile
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fn in files:
+            fp = safe_path(WORKSPACE, fn)
+            if os.path.isfile(fp):
+                zf.write(fp, fn)
     return send_file(zip_path, as_attachment=True, download_name=f"{project_name}.zip")
 
 # ── Node API ─────────────────────────────────────────────────

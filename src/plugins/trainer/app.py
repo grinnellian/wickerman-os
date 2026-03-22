@@ -67,14 +67,14 @@ def run_training(config):
         log_training(f"Dataset loaded: {len(ds)} examples")
         
         output_name = config.get("output_name", f"lora_{int(time.time())}")
-        output_path = os.path.join(LORA_DIR, output_name)
+        output_path = safe_path(LORA_DIR, output_name)
         
         trainer = SFTTrainer(
             model=model, tokenizer=tokenizer, train_dataset=ds,
             dataset_text_field=config.get("text_field", "text"),
             max_seq_length=config.get("max_seq_length", 2048),
             args=TrainingArguments(
-                output_dir=os.path.join(OUTPUT_DIR, output_name),
+                output_dir=safe_path(OUTPUT_DIR, output_name),
                 per_device_train_batch_size=config.get("batch_size", 2),
                 gradient_accumulation_steps=config.get("grad_accum", 4),
                 num_train_epochs=config.get("epochs", 3),
@@ -117,6 +117,15 @@ def list_models():
         full = os.path.join(MODEL_DIR, f)
         if os.path.isfile(full):
             models.append({"name": f, "size_mb": round(os.path.getsize(full) / 1024 / 1024, 1)})
+        elif os.path.isdir(full) and any(
+            cf.endswith((".bin", ".safetensors", ".json"))
+            for cf in os.listdir(full)
+        ):
+            dir_size = sum(
+                os.path.getsize(os.path.join(full, cf))
+                for cf in os.listdir(full) if os.path.isfile(os.path.join(full, cf))
+            )
+            models.append({"name": f, "size_mb": round(dir_size / 1024 / 1024, 1)})
     return jsonify(models)
 
 @app.route("/api/datasets")

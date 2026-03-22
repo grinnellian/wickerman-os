@@ -623,6 +623,13 @@ def resolve_volume(spec, plugin_id):
         .replace("{loras}", f"{SUPPORT_DIR}/loras")
         .replace("{support}", SUPPORT_DIR)
         .replace("{workspace}", f"{HOST_BASE}/workspace"))
+    # Validate resolved path stays within expected directories
+    resolved = os.path.realpath(host)
+    allowed_roots = [os.path.realpath(SUPPORT_DIR), os.path.realpath(HOST_BASE)]
+    if not any(resolved.startswith(root) for root in allowed_roots):
+        if not host.startswith("/var/run/"):  # allow docker socket
+            write_log(f"[SECURITY] Volume path traversal blocked: {spec} resolved to {resolved}")
+            raise ValueError(f"Volume path outside allowed directories: {host}")
     return host, cpath, mode
 
 @ui.page("/")
@@ -1105,4 +1112,15 @@ def index():
         if any(_inst_state.get(c,{}).get("state") in ("running","error") for c in changed): rebuild()
     ui.timer(1.0, watch)
 
-ui.run(host="0.0.0.0", port=8000, title="Wickerman OS", dark=True, show=False, storage_secret="wm-secret")
+def _get_storage_secret():
+    secret_file = "/app/data/.storage_secret"
+    if os.path.isfile(secret_file):
+        with open(secret_file) as f: return f.read().strip()
+    import secrets
+    secret = secrets.token_hex(32)
+    os.makedirs(os.path.dirname(secret_file), exist_ok=True)
+    with open(secret_file, "w") as f: f.write(secret)
+    os.chmod(secret_file, 0o600)
+    return secret
+
+ui.run(host="0.0.0.0", port=8000, title="Wickerman OS", dark=True, show=False, storage_secret=_get_storage_secret())

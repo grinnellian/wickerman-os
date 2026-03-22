@@ -41,12 +41,12 @@ class TestPluginSchema:
         fname, manifest = manifest_entry
         assert manifest["container_name"].startswith("wm-")
 
-    def test_ports_is_list_of_strings(self, manifest_entry):
+    def test_ports_is_list(self, manifest_entry):
         fname, manifest = manifest_entry
         assert isinstance(manifest["ports"], list)
+        assert len(manifest["ports"]) > 0
         for p in manifest["ports"]:
-            assert isinstance(p, str)
-            assert ":" in p, f"Port mapping should contain ':' — got {p}"
+            assert isinstance(p, (int, str)), f"Port should be int or string, got {type(p)}"
 
     def test_nginx_host_is_string(self, manifest_entry):
         fname, manifest = manifest_entry

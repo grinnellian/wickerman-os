@@ -1,12 +1,12 @@
 """
-Wickerman OS v5.1.0 — Flow Editor plugin manifest.
+Wickerman OS v5.2.0 — Flow Editor plugin manifest.
 """
 
 WM_FLOW = {
     "name": "Flow Editor",
     "description": "Visual node-based flow editor for agentic AI pipelines (Flowise)",
     "icon": "account_tree",
-    "image": "flowiseai/flowise:latest",
+    "image": "flowiseai/flowise:2.2.7",
     "container_name": "wm-flow",
     "url": "http://flow.wickerman.local",
     "ports": [3000],

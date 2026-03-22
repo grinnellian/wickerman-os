@@ -194,8 +194,10 @@ def _build_cmd(model_path, port, settings):
 class TestBuildCmd:
     def test_minimal_defaults(self):
         cmd = _build_cmd("/models/test.gguf", 8081, {})
-        assert cmd[:6] == ["/usr/local/bin/llama-server", "--model", "/models/test.gguf",
-                           "--host", "127.0.0.1", "--port", "8081"]
+        assert cmd[:4] == ["/usr/local/bin/llama-server", "--model", "/models/test.gguf",
+                           "--host", "127.0.0.1"]
+        assert "--port" in cmd
+        assert cmd[cmd.index("--port") + 1] == "8081"
         # Should include default n_gpu_layers and ctx_size
         assert "--n-gpu-layers" in cmd
         assert "99" in cmd

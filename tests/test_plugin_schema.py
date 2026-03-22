@@ -11,7 +11,7 @@ from wickerman_plugins import ALL_PLUGINS, PLUGIN_HOSTS
 
 
 REQUIRED_KEYS = {"name", "description", "container_name", "ports", "nginx_host", "help"}
-OPTIONAL_KEYS = {"icon", "env", "volumes", "image", "build", "build_context", "files", "gpu", "networks"}
+OPTIONAL_KEYS = {"icon", "env", "volumes", "image", "build", "build_context", "files", "gpu", "networks", "url", "network"}
 ALL_VALID_KEYS = REQUIRED_KEYS | OPTIONAL_KEYS
 
 

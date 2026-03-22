@@ -20,7 +20,10 @@ version = {attr = "src.shared.version.__version__"}
 [tool.ruff]
 target-version = "py310"
 line-length = 120
-src = ["src", "wickerman_plugins"]
+src = ["wickerman_plugins", "tests"]
+# Exclude extracted runtime source — that's the original author's code.
+# Lint it separately once we're ready to propose style changes upstream.
+exclude = ["src/"]
 
 [tool.ruff.lint]
 select = [

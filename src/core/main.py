@@ -363,7 +363,6 @@ _inst_state, _bg_tasks = {}, set()
 _session_id = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 _log_path = f"{LOG_DIR}/session_{_session_id}.log"
 
-from collections import deque
 _log_buffer = []
 _LOG_MAX = 2000
 

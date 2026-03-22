@@ -345,43 +345,26 @@ echo "Wickerman OS is ready — http://wickerman.local"
     # ── Initialize Git repos ────────────────────────────────────────────
     print("  Initializing version control...")
 
-    # Install repo — tracks system config
-    install_gitignore = """__pycache__/
-*.pyc
-*.log
-.env
-"""
-    write_file(INSTALL_DIR / ".gitignore", install_gitignore)
-    if not (INSTALL_DIR / ".git").exists():
-        run(f"git -C {INSTALL_DIR} init", ignore=True)
-        run(f"git -C {INSTALL_DIR} config user.name 'Wickerman OS'", ignore=True)
-        run(f"git -C {INSTALL_DIR} config user.email 'wickerman@local'", ignore=True)
-    run(f"git -C {INSTALL_DIR} add -A", ignore=True)
-    install_has_commits = run(f"git -C {INSTALL_DIR} rev-parse HEAD", ignore=True)
-    run(f'git -C {INSTALL_DIR} commit -m "Wickerman OS v{VERSION} — {"reinstall" if install_has_commits else "fresh install"}"', ignore=True)
+    def init_git_repo(repo_dir, gitignore_content, commit_msg):
+        """Initialize or update a git repo with a commit."""
+        write_file(repo_dir / ".gitignore", gitignore_content)
+        if not (repo_dir / ".git").exists():
+            run(f"git -C {repo_dir} init", ignore=True)
+            run(f"git -C {repo_dir} config user.name 'Wickerman OS'", ignore=True)
+            run(f"git -C {repo_dir} config user.email 'wickerman@local'", ignore=True)
+        run(f"git -C {repo_dir} add -A", ignore=True)
+        has_commits = run(f"git -C {repo_dir} rev-parse HEAD", ignore=True)
+        label = "reinstall" if has_commits else "fresh install"
+        run(f'git -C {repo_dir} commit -m "{commit_msg} — {label}"', ignore=True)
+        run(f"chown -R {shell_user} {repo_dir}/.git", ignore=True)
 
-    # Support repo — tracks plugins and configs (not models/datasets)
-    support_gitignore = """models/
-datasets/
-loras/
-*.gguf
-*.bin
-*.safetensors
-__pycache__/
-*.pyc
-"""
-    write_file(SUPPORT_DIR / ".gitignore", support_gitignore)
-    if not (SUPPORT_DIR / ".git").exists():
-        run(f"git -C {SUPPORT_DIR} init", ignore=True)
-        run(f"git -C {SUPPORT_DIR} config user.name 'Wickerman OS'", ignore=True)
-        run(f"git -C {SUPPORT_DIR} config user.email 'wickerman@local'", ignore=True)
-    run(f"git -C {SUPPORT_DIR} add -A", ignore=True)
-    support_has_commits = run(f"git -C {SUPPORT_DIR} rev-parse HEAD", ignore=True)
-    run(f'git -C {SUPPORT_DIR} commit -m "WickermanSupport — {"post-install sync" if support_has_commits else "initial state"}"', ignore=True)
+    init_git_repo(INSTALL_DIR,
+        "__pycache__/\n*.pyc\n*.log\n.env\n",
+        f"Wickerman OS v{VERSION}")
 
-    # Fix .git ownership so host-side git commands work without sudo
-    run(f"chown -R {shell_user} {INSTALL_DIR}/.git", ignore=True)
-    run(f"chown -R {shell_user} {SUPPORT_DIR}/.git", ignore=True)
+    init_git_repo(SUPPORT_DIR,
+        "models/\ndatasets/\nloras/\n*.gguf\n*.bin\n*.safetensors\n__pycache__/\n*.pyc\n",
+        "WickermanSupport")
 
     # ── Done ─────────────────────────────────────────────────────────────
     print(f"\n  ✓ Wickerman OS v{VERSION} installed.")

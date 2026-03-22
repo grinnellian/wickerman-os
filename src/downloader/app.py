@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 app = Flask(__name__)
 MODEL_DIR  = "/data/models"
 STATE_FILE = "/data/downloads_state.json"
-downloads  = {}
+downloads: dict[str, dict] = {}
 _lock      = threading.Lock()
 _dl_pool   = ThreadPoolExecutor(max_workers=3)
 os.makedirs(MODEL_DIR, exist_ok=True)

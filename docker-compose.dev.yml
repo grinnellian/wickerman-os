@@ -25,6 +25,7 @@ services:
     working_dir: /workspace
     environment:
       - PYTHONDONTWRITEBYTECODE=1
+      - GH_TOKEN=${GH_TOKEN:-}
     command: sleep infinity
     ## Uncomment to skip firewall (faster startup, less secure):
     # entrypoint: ""

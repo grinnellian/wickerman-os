@@ -51,4 +51,9 @@ RUN mkdir -p /commandhistory \
     && echo 'SAVEHIST=10000' >> /home/$USERNAME/.zshrc \
     && echo 'HISTFILE=/commandhistory/.zsh_history' >> /home/$USERNAME/.zshrc
 
+# Git: use GH_TOKEN env var for HTTPS push when available
+RUN printf '#!/bin/sh\nif [ -n "$GH_TOKEN" ]; then\n  echo "protocol=https"\n  echo "host=github.com"\n  echo "username=x-access-token"\n  echo "password=$GH_TOKEN"\nfi\n' \
+    > /usr/local/bin/git-credential-env && chmod +x /usr/local/bin/git-credential-env \
+    && git config --system credential.helper /usr/local/bin/git-credential-env
+
 USER $USERNAME

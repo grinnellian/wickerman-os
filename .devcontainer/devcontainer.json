@@ -32,7 +32,8 @@
     "source=wickerman-bashhistory-${devcontainerId},target=/commandhistory,type=volume"
   ],
   "containerEnv": {
-    "PYTHONDONTWRITEBYTECODE": "1"
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",

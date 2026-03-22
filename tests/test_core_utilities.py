@@ -5,7 +5,7 @@ These functions are tested by re-implementing them in isolation since
 the source files have heavy framework dependencies (Flask, NiceGUI, etc.)
 that can't be imported without Docker.
 """
-import os
+import os  # noqa: I001
 import re
 
 import pytest

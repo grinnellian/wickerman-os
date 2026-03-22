@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, ".")
 
-import pytest
+import pytest  # noqa: I001
 
 from wickerman_plugins import ALL_PLUGINS, PLUGIN_HOSTS
 

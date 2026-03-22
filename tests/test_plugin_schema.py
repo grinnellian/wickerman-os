@@ -5,9 +5,10 @@ Validates that all plugin manifests conform to the expected schema.
 import json
 import sys
 
+sys.path.insert(0, ".")
+
 import pytest
 
-sys.path.insert(0, ".")
 from wickerman_plugins import ALL_PLUGINS, PLUGIN_HOSTS
 
 
@@ -84,7 +85,7 @@ class TestPluginSchema:
             assert "{" not in host_part, f"{fname} volume has invalid token in: {vol}"
 
     def test_json_serializable(self, manifest_entry):
-        fname, manifest = manifest_entry
+        _fname, manifest = manifest_entry
         serialized = json.dumps(manifest, indent=2)
         roundtripped = json.loads(serialized)
         assert roundtripped["name"] == manifest["name"]

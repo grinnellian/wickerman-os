@@ -4,7 +4,6 @@ Tests the core agent pipeline logic from the Model Router.
 Functions are reimplemented for isolation since the full manager.py
 requires llama.cpp, faiss, etc.
 """
-import pytest
 
 
 # ── Reimplemented pipeline functions ─────────────────────────────────────
@@ -159,7 +158,7 @@ class TestSplitLongText:
         assert len(result) > 1
         # All paragraphs should appear in some chunk
         full = " ".join(result)
-        for p in paragraphs:
+        for _p in paragraphs:
             assert "Paragraph" in full
 
 

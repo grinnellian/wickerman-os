@@ -383,7 +383,7 @@ class TestResolveVolume:
         assert m == "ro"
 
     def test_default_mode_is_rw(self):
-        h, c, m = resolve_volume("{self}/data:/data", "test")
+        _h, _c, m = resolve_volume("{self}/data:/data", "test")
         assert m == "rw"
 
     def test_multiple_tokens_in_one_spec(self):

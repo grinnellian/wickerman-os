@@ -6,9 +6,9 @@ to what the original string constants contained.
 import json
 import sys
 
-import pytest
-
 sys.path.insert(0, ".")
+
+import pytest
 
 
 class TestCoreConstants:

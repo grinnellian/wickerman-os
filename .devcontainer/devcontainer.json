@@ -38,6 +38,6 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "pip install -e '.[dev]'",
+  "postCreateCommand": "sudo chown dev:dev /home/dev/.claude && pip install -e '.[dev]'",
   "postStartCommand": "sudo /usr/local/bin/init-firewall.sh"
 }

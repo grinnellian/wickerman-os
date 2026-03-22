@@ -45,8 +45,9 @@ RUN pip install --no-cache-dir \
 COPY init-firewall.sh /usr/local/bin/init-firewall.sh
 RUN chmod +x /usr/local/bin/init-firewall.sh
 
-# Workspace
-RUN mkdir -p /workspace && chown $USERNAME:$USERNAME /workspace
+# Workspace and Claude config dir (volume mount target, must be owned by dev user)
+RUN mkdir -p /workspace /home/$USERNAME/.claude \
+    && chown $USERNAME:$USERNAME /workspace /home/$USERNAME/.claude
 WORKDIR /workspace
 
 # Command history persistence

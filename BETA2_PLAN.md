@@ -5,6 +5,18 @@
 > Goal: Move from "functional prototype with non-standard structure" to "standard Python project with tests, CI, and maintainable code"
 > Scope: Beta 2 — not production. Focus on structural soundness and preserving author intent.
 
+## Status (2026-03-21)
+
+| Phase | Status | Issues |
+|-------|--------|--------|
+| **0. Foundation** | **DONE** | #1, #2, #3 closed |
+| **1. Tests** | **Mostly done** | #4, #5, #7 closed; #6 (pipeline/RAG tests) open |
+| **2. Security** | **DONE** | #8, #9, #10, #11 closed |
+| **3. Code Quality** | **Partially done** | #15 closed; #12 (ruff), #13 (type hints), #14 (refactor monoliths) open |
+| **4. Infrastructure** | **Partially done** | #18 closed; #17 (CI pipeline) open — CI config exists, needs tests to pass |
+
+**Remaining open issues**: #6, #12, #13, #14, #17 — all P0/P2, none blocking.
+
 ---
 
 ## Guiding Principles

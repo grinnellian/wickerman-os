@@ -1,14 +1,29 @@
-## Standalone dev environment (no VS Code required)
+## Dev environment with network-isolated proxy firewall.
 ##
 ## Usage:
 ##   docker compose -f docker-compose.dev.yml build
 ##   docker compose -f docker-compose.dev.yml up -d
 ##   docker compose -f docker-compose.dev.yml exec dev zsh
 ##
-## Inside the container: claude, pytest, ruff, mypy are all available.
-## The repo is mounted at /workspace.
+## Inside the container: claude, pytest, ruff, mypy, gh are all available.
+## Outbound HTTP/HTTPS is filtered by the proxy — see .devcontainer/allowlist.conf.
+
+networks:
+  isolated:
+    internal: true   # no outbound route — only the proxy can bridge to the internet
 
 services:
+  proxy:
+    build:
+      context: .devcontainer/proxy
+    container_name: wickerman-proxy
+    networks:
+      - isolated     # dev container connects here
+      - default      # proxy connects to internet here
+    volumes:
+      - ./.devcontainer/allowlist.conf:/etc/tinyproxy/allowlist:ro
+    restart: unless-stopped
+
   dev:
     build:
       context: .devcontainer
@@ -16,9 +31,10 @@ services:
         TZ: ${TZ:-America/Los_Angeles}
         CLAUDE_CODE_VERSION: latest
     container_name: wickerman-dev
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
+    networks:
+      - isolated     # ONLY the isolated network — no internet except through proxy
+    depends_on:
+      - proxy
     volumes:
       - .:/workspace:delegated
       - wickerman-history:/commandhistory
@@ -27,9 +43,13 @@ services:
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - GH_TOKEN=${GH_TOKEN:-}
+      - http_proxy=http://proxy:3128
+      - https_proxy=http://proxy:3128
+      - HTTP_PROXY=http://proxy:3128
+      - HTTPS_PROXY=http://proxy:3128
+      - no_proxy=localhost,127.0.0.1,::1
+      - NO_PROXY=localhost,127.0.0.1,::1
     command: sleep infinity
-    ## Uncomment to skip firewall (faster startup, less secure):
-    # entrypoint: ""
 
 volumes:
   wickerman-history:

@@ -104,7 +104,7 @@ If you find a security vulnerability, please report it responsibly. Key areas to
 - **Volume mounts:** `resolve_volume()` validates paths within allowed directories
 - **CORS:** Configured via `CORS_ORIGINS` environment variable (default: localhost only)
 - **Network:** Nginx binds to `127.0.0.1` by default — LAN access is opt-in
-- **Dev container firewall:** Outbound traffic restricted to allowlisted domains only — see `.devcontainer/init-firewall.sh`
+- **Dev container firewall:** The dev container runs on an isolated Docker network with no direct internet access. Outbound HTTP/HTTPS is routed through a tinyproxy sidecar that filters by domain name. See `.devcontainer/allowlist.conf` for the domain list. To add a domain at runtime: edit the allowlist and run `docker compose -f docker-compose.dev.yml kill -s HUP proxy` from the host.
 - **GH_TOKEN:** Forwarded into the container for git push — use a fine-grained PAT scoped to this repo with Contents read/write only
 
 ## Code Style

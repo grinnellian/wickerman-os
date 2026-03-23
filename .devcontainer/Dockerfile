@@ -15,7 +15,7 @@ ENV TZ=${TZ} \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git curl ca-certificates sudo make \
         zsh nano vim less jq \
-        iptables ipset iproute2 dnsutils \
+        iproute2 dnsutils \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
@@ -40,10 +40,6 @@ RUN pip install --no-cache-dir \
     pytest-cov>=5.0 \
     ruff>=0.4 \
     mypy>=1.10
-
-# Firewall script
-COPY init-firewall.sh /usr/local/bin/init-firewall.sh
-RUN chmod +x /usr/local/bin/init-firewall.sh
 
 # Workspace and Claude config dir (volume mount target, must be owned by dev user)
 RUN mkdir -p /workspace /home/$USERNAME/.claude \
